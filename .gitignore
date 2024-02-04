@@ -2,3 +2,4 @@ particle
 stableFluids
 .DS_store
 imgui.ini
+.vscode
