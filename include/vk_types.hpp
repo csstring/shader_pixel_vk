@@ -22,8 +22,8 @@
     }
 
 struct AllocatedBuffer {
-    VkBuffer _buffer;
-    VmaAllocation _allocation;
+    VkBuffer buffer;
+    VmaAllocation allocation;
 };
 
 struct AllocatedImage {
@@ -166,3 +166,41 @@ class Scene
 		virtual void init_pipelines() = 0;
     virtual ~Scene(){};
 };
+
+// struct DrawContext {
+//     std::vector<RenderObjectTest> OpaqueSurfaces;
+//     std::vector<RenderObjectTest> TransparentSurfaces;
+// };
+
+// class IRenderable {
+
+//     virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
+// };
+
+// enum class MaterialPass :uint8_t {
+//     MainColor,
+//     Transparent,
+//     Other
+// };
+
+// struct MaterialPipeline {
+// 	VkPipeline pipeline;
+// 	VkPipelineLayout layout;
+// };
+
+// struct MaterialInstance {
+//     MaterialPipeline* pipeline;
+//     VkDescriptorSet materialSet;
+//     MaterialPass passType;
+// };
+
+// struct RenderObjectTest {
+//     uint32_t indexCount;
+//     uint32_t firstIndex;
+
+//     VkBuffer indexBuffer;
+//     VkBuffer vertexBuffer;
+//     MaterialInstance* material;
+
+//     glm::mat4 transform;
+// };

@@ -4,11 +4,38 @@
 #include "vk_mesh.hpp"
 #include <glm/glm.hpp>
 #include <unordered_map>
+#include "vk_loader.hpp"  
 
 constexpr unsigned int FRAME_OVERLAP = 2;
-class ParticleScene;
-class StableFluidsScene;
 class CloudScene;
+
+// struct GLTFMetallic_Roughness {
+// 	MaterialPipeline opaquePipeline;
+// 	MaterialPipeline transparentPipeline;
+
+// 	VkDescriptorSetLayout materialLayout;
+
+// 	struct MaterialConstants {
+// 		glm::vec4 colorFactors;
+// 		glm::vec4 metal_rough_factors;
+// 		//padding, we need it anyway for uniform buffers
+// 		glm::vec4 extra[14];
+// 	};
+
+// 	struct MaterialResources {
+// 		AllocatedImage colorImage;
+// 		VkSampler colorSampler;
+// 		AllocatedImage metalRoughImage;
+// 		VkSampler metalRoughSampler;
+// 		VkBuffer dataBuffer;
+// 		uint32_t dataBufferOffset;
+// 	};
+
+// 	void build_pipelines(VulkanEngine* engine);
+// 	void clear_resources(VkDevice device);
+
+// 	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+// };
 
 class VulkanEngine
 {
@@ -27,8 +54,6 @@ class VulkanEngine
     void init_imgui();
 
   private:  
-    ParticleScene* particleScene;
-    StableFluidsScene* fluidScene;
     CloudScene* cloudScene;
 
   public :
@@ -38,6 +63,7 @@ class VulkanEngine
     void run();
     void load_images();
 	  void upload_mesh(Mesh& mesh);
+    GPUMeshBuffers uploadMeshBuffers(std::vector<uint32_t> indices, std::vector<Vertex> vertices);
     FrameData& get_current_frame(){return _frames[_frameNumber % FRAME_OVERLAP];}
     Material* create_material(VkPipeline pipeline, VkPipelineLayout layout,
     const std::string& name, 
@@ -106,4 +132,6 @@ class VulkanEngine
     vkutil::DescriptorLayoutCache* _descriptorLayoutCache{nullptr};
     vkutil::DescriptorAllocator* _descriptorAllocator{nullptr};
 
+
+  	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 };

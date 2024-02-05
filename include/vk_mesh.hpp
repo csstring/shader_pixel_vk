@@ -21,3 +21,8 @@ struct Mesh {
 
   bool load_from_obj(const char* filename);
 };
+
+struct GPUMeshBuffers {
+    AllocatedBuffer indexBuffer;
+    AllocatedBuffer vertexBuffer;
+};

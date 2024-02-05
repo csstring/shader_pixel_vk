@@ -6,7 +6,9 @@ SRC_DIR = ./
 
 OBJ_DIR = ./obj
 
-INC_DIR = -I./ -I./SDL2 -I./imgui -I./volk -I./vkbootstrap -I./tinyobjloader -I./vma -I./stb_image -I./particle/include -I./stableFluids/include -I./cloud/include
+INC_DIR = -I./include -I./SDL2 -I./imgui -I./volk -I./vkbootstrap -I./tinyobjloader \
+-I./vma -I./stb_image -I./cloud/include \
+-I./vulkan -I./fastgltf/include -I./
 
 VK_LIB_DIR := $(shell echo $$DYLD_LIBRARY_PATH)
 
@@ -14,17 +16,17 @@ BREW_LIB_DIR = /Users/schoe/.brew/lib
 
 TARGET = ./a.out
 
-SOURCES = $(wildcard $(SRC_DIR)/*.cpp ./imgui/*.cpp ./volk/*.cpp ./vkbootstrap/*.cpp ./tinyobjloader/*.cpp ./particle/*.cpp ./stableFluids/*.cpp ./cloud/*.cpp) 
+SOURCES = $(wildcard $(SRC_DIR)/*.cpp ./imgui/*.cpp ./volk/*.cpp \
+./vkbootstrap/*.cpp ./tinyobjloader/*.cpp ./cloud/*.cpp ./fastgltf/*.cpp) 
 
 OBJECTS = $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,\
 $(patsubst ./imgui/%.cpp,$(OBJ_DIR)/%.o,\
 $(patsubst ./volk/%.cpp,$(OBJ_DIR)/%.o,\
 $(patsubst ./vkbootstrap/%.cpp,$(OBJ_DIR)/%.o,\
 $(patsubst ./tinyobjloader/%.cpp,$(OBJ_DIR)/%.o,\
-$(patsubst ./particle/%.cpp,$(OBJ_DIR)/%.o,\
-$(patsubst ./stableFluids/%.cpp,$(OBJ_DIR)/%.o,\
 $(patsubst ./cloud/%.cpp,$(OBJ_DIR)/%.o,\
-$(SOURCES)))))))))
+$(patsubst ./fastgltf/%.cpp,$(OBJ_DIR)/%.o,\
+$(SOURCES))))))))
 
 all: $(TARGET)
 
@@ -46,13 +48,10 @@ $(OBJ_DIR)/%.o: ./vkbootstrap/%.cpp
 $(OBJ_DIR)/%.o: ./tinyobjloader/%.cpp
 	$(CXX) $(CXXFLAGS) $(INC_DIR) -c $< -o $@
 
-$(OBJ_DIR)/%.o: ./particle/%.cpp
-	$(CXX) $(CXXFLAGS) $(INC_DIR) -c $< -o $@
-
-$(OBJ_DIR)/%.o: ./stableFluids/%.cpp
-	$(CXX) $(CXXFLAGS) $(INC_DIR) -c $< -o $@
-
 $(OBJ_DIR)/%.o: ./cloud/%.cpp
+	$(CXX) $(CXXFLAGS) $(INC_DIR) -c $< -o $@
+
+$(OBJ_DIR)/%.o: ./fastgltf/%.cpp
 	$(CXX) $(CXXFLAGS) $(INC_DIR) -c $< -o $@
 
 clean:

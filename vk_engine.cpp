@@ -18,8 +18,6 @@
 #include <random>
 #include "Camera.hpp"
 #include "SDL_Event.hpp"
-#include "ParticleScene.hpp"
-#include "StableFluidsScene.hpp"
 #include "Cloud.hpp"
 
 void VulkanEngine::init()
@@ -42,20 +40,14 @@ void VulkanEngine::init()
 	_descriptorLayoutCache = new vkutil::DescriptorLayoutCache;
 	_descriptorAllocator->init(_device);
 	_descriptorLayoutCache->init(_device);
-	particleScene = new ParticleScene;
-	particleScene->initialize(this);
-	
-	fluidScene = new StableFluidsScene();
-	fluidScene->initialize(this);
+
 
 	init_swapchain();
   init_commands();
   init_default_renderpass();
 	init_framebuffers();
   init_sync_structures();
-	particleScene->load_particle();
-	fluidScene->load_vertex();
-	fluidScene->init_image_buffer();
+
 	init_descriptors();
   init_pipelines();
 	init_imgui();
@@ -191,8 +183,6 @@ void VulkanEngine::init_commands()
 		vkDestroyCommandPool(_device, _uploadContext._commandPool, nullptr);
 	});
 
-	particleScene->init_commands();
-	fluidScene->init_commands();
 }
 
 void VulkanEngine::init_default_renderpass()
@@ -333,8 +323,6 @@ void VulkanEngine::init_sync_structures()
 		vkDestroyFence(_device, _uploadContext._uploadFence, nullptr);
 	});
 
-	particleScene->init_sync_structures();
-	fluidScene->init_sync_structures();
 }
 
 void VulkanEngine::init_descriptors()
@@ -349,17 +337,17 @@ void VulkanEngine::init_descriptors()
 		_frames[i].objectBuffer = create_buffer(sizeof(GPUObjectData)*max_object, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
 		VkDescriptorBufferInfo objectBufferInfo;
-		objectBufferInfo.buffer = _frames[i].objectBuffer._buffer;
+		objectBufferInfo.buffer = _frames[i].objectBuffer.buffer;
 		objectBufferInfo.offset = 0;
 		objectBufferInfo.range = sizeof(GPUObjectData) * max_object;
 
 		VkDescriptorBufferInfo cameraInfo;
-		cameraInfo.buffer = _cameraBuffer._buffer;
+		cameraInfo.buffer = _cameraBuffer.buffer;
 		cameraInfo.offset = 0;
 		cameraInfo.range = sizeof(GPUCameraData);
 
 		VkDescriptorBufferInfo sceneInfo;
-		sceneInfo.buffer = _sceneParameterBuffer._buffer;
+		sceneInfo.buffer = _sceneParameterBuffer.buffer;
 		sceneInfo.offset = 0;
 		sceneInfo.range = sizeof(GPUSceneData);
 
@@ -373,23 +361,18 @@ void VulkanEngine::init_descriptors()
 											build(_frames[i].objectDescriptor, _objectSetLayout);
 
 		_mainDeletionQueue.push_function([=]() {
-			vmaDestroyBuffer(_allocator, _frames[i].objectBuffer._buffer, _frames[i].objectBuffer._allocation);
+			vmaDestroyBuffer(_allocator, _frames[i].objectBuffer.buffer, _frames[i].objectBuffer.allocation);
 		});
 	}
 	_mainDeletionQueue.push_function([=]() {
-			vmaDestroyBuffer(_allocator, _cameraBuffer._buffer, _cameraBuffer._allocation);
-			vmaDestroyBuffer(_allocator, _sceneParameterBuffer._buffer, _sceneParameterBuffer._allocation);
+			vmaDestroyBuffer(_allocator, _cameraBuffer.buffer, _cameraBuffer.allocation);
+			vmaDestroyBuffer(_allocator, _sceneParameterBuffer.buffer, _sceneParameterBuffer.allocation);
 	});
 
-	particleScene->init_descriptors();
-	fluidScene->init_descriptors();
 }
 
 void VulkanEngine::init_pipelines()
 {
-	particleScene->init_pipelines();
-	particleScene->init_compute_pipelines();
-	fluidScene->init_pipelines();
 }
 
 //------------------run-------------
@@ -413,9 +396,6 @@ void VulkanEngine::run()
 		ImGui::Text("carmera pos x : %f y : %f z : %f", camera._cameraPos.x, camera._cameraPos.y, camera._cameraPos.z);
 
 		ImGui::End();
-		// particleScene->update(0, _frameNumber % 2);
-		// fluidScene->update(0, _frameNumber % 2);
-		// cloudScene->update(1./120., _frameNumber % 2);
 		draw();
 	}
 }
@@ -518,8 +498,6 @@ void VulkanEngine::cleanup()
 		for (int i =0; i < FRAME_OVERLAP; ++i){
     	vkWaitForFences(_device, 1, &_frames[i]._renderFence, true, 1000000000);
 		}
-		delete particleScene;
-		delete fluidScene;
 		delete cloudScene;
     _mainDeletionQueue.flush();
 		_descriptorLayoutCache->cleanup();
@@ -543,58 +521,79 @@ void VulkanEngine::load_meshes()
 void VulkanEngine::upload_mesh(Mesh& mesh)
 {
 	const size_t bufferSize = mesh._vertices.size() * sizeof(Vertex);
-	//allocate vertex buffer
-	VkBufferCreateInfo stagingBufferInfo = {};
-	stagingBufferInfo.pNext = nullptr;
-	stagingBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	stagingBufferInfo.size = bufferSize;
-	stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
+	mesh._vertexBuffer = create_buffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT ,
+		VMA_MEMORY_USAGE_GPU_ONLY);
+	AllocatedBuffer staging = create_buffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
 
-	//let the VMA library know that this data should be writeable by CPU, but also readable by GPU
-	VmaAllocationCreateInfo vmaallocInfo = {};
-	vmaallocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+	void* data;
+	vmaMapMemory(_allocator, staging.allocation, &data);
+	memcpy(data, mesh._vertices.data(), bufferSize);
+  vmaUnmapMemory(_allocator, staging.allocation);
 
-	AllocatedBuffer stagingBuffer;
-	//allocate the buffer
-	VK_CHECK(vmaCreateBuffer(_allocator, &stagingBufferInfo, &vmaallocInfo,
-		&stagingBuffer._buffer,
-		&stagingBuffer._allocation,
-		nullptr));
+	immediate_submit([&](VkCommandBuffer cmd) {
+		VkBufferCopy vertexCopy{ 0 };
+		vertexCopy.dstOffset = 0;
+		vertexCopy.srcOffset = 0;
+		vertexCopy.size = bufferSize;
 
-  void* data;
-  vmaMapMemory(_allocator, stagingBuffer._allocation, &data);
-  memcpy(data, mesh._vertices.data(), bufferSize);
-  vmaFlushAllocation(_allocator, stagingBuffer._allocation, 0, VK_WHOLE_SIZE);
-  vmaUnmapMemory(_allocator, stagingBuffer._allocation);
-
-	VkBufferCreateInfo vertexBufferInfo = {};
-	vertexBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	vertexBufferInfo.pNext = nullptr;
-	vertexBufferInfo.size = bufferSize;
-	vertexBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	vmaallocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-	//allocate the buffer
-	VK_CHECK(vmaCreateBuffer(_allocator, &vertexBufferInfo, &vmaallocInfo,
-		&mesh._vertexBuffer._buffer,
-		&mesh._vertexBuffer._allocation,
-		nullptr));
-
-	immediate_submit([=](VkCommandBuffer cmd){
-		VkBufferCopy copy;
-		copy.dstOffset = 0;
-		copy.srcOffset = 0;
-		copy.size = bufferSize;
-		vkCmdCopyBuffer(cmd, stagingBuffer._buffer, mesh._vertexBuffer._buffer, 1, &copy);
+		vkCmdCopyBuffer(cmd, staging.buffer, mesh._vertexBuffer.buffer, 1, &vertexCopy);
 	});
 
 	_mainDeletionQueue.push_function([=]() {
-	vmaDestroyBuffer(_allocator, mesh._vertexBuffer._buffer, mesh._vertexBuffer._allocation);
+	vmaDestroyBuffer(_allocator, mesh._vertexBuffer.buffer, mesh._vertexBuffer.allocation);
 	});
-	vmaDestroyBuffer(_allocator, stagingBuffer._buffer, stagingBuffer._allocation);
+	vmaDestroyBuffer(_allocator, staging.buffer, staging.allocation);
 }
 
+GPUMeshBuffers VulkanEngine::uploadMeshBuffers(std::vector<uint32_t> indices, std::vector<Vertex> vertices)
+{
+	const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
+	const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
+	GPUMeshBuffers newSurface;
+	
+	newSurface.vertexBuffer = create_buffer(vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT ,
+		VMA_MEMORY_USAGE_GPU_ONLY);
+	newSurface.indexBuffer = create_buffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VMA_MEMORY_USAGE_GPU_ONLY);
+
+	AllocatedBuffer staging = create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+
+	void* data;
+
+	vmaMapMemory(_allocator, staging.allocation, &data);
+	memcpy(data, vertices.data(), vertexBufferSize);
+  vmaUnmapMemory(_allocator, staging.allocation);
+
+
+	vmaMapMemory(_allocator, staging.allocation, &data);
+	memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
+  vmaUnmapMemory(_allocator, staging.allocation);
+
+	immediate_submit([&](VkCommandBuffer cmd) {
+		VkBufferCopy vertexCopy{ 0 };
+		vertexCopy.dstOffset = 0;
+		vertexCopy.srcOffset = 0;
+		vertexCopy.size = vertexBufferSize;
+
+		vkCmdCopyBuffer(cmd, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
+
+		VkBufferCopy indexCopy{ 0 };
+		indexCopy.dstOffset = 0;
+		indexCopy.srcOffset = vertexBufferSize;
+		indexCopy.size = indexBufferSize;
+
+		vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
+	});
+
+	_mainDeletionQueue.push_function([=]() {
+	vmaDestroyBuffer(_allocator, newSurface.vertexBuffer.buffer, newSurface.vertexBuffer.allocation);
+	vmaDestroyBuffer(_allocator, newSurface.indexBuffer.buffer, newSurface.indexBuffer.allocation);
+	});
+	vmaDestroyBuffer(_allocator, staging.buffer, staging.allocation);
+
+	return newSurface;
+}
 Material* VulkanEngine::create_material(VkPipeline pipeline, VkPipelineLayout layout, 
 const std::string& name, uint32_t layoutCount, VkDescriptorSet descriptorSet, 
 uint32_t constantSize, void* constantPtr)
@@ -664,23 +663,23 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd,RenderObject* first, int cou
 
 	int frameIndex = _frameNumber % FRAME_OVERLAP;
 	char* sceneData;
-	vmaMapMemory(_allocator, _sceneParameterBuffer._allocation , (void**)&sceneData);
+	vmaMapMemory(_allocator, _sceneParameterBuffer.allocation , (void**)&sceneData);
 	const uint32_t SceneOffset = pad_uniform_buffer_size(sizeof(GPUSceneData)) * frameIndex;
 	sceneData += SceneOffset;
 	memcpy(sceneData, &_sceneParameters, sizeof(GPUSceneData));
-	vmaFlushAllocation(_allocator, _sceneParameterBuffer._allocation, SceneOffset, sizeof(GPUSceneData));
-	vmaUnmapMemory(_allocator, _sceneParameterBuffer._allocation);
+	vmaFlushAllocation(_allocator, _sceneParameterBuffer.allocation, SceneOffset, sizeof(GPUSceneData));
+	vmaUnmapMemory(_allocator, _sceneParameterBuffer.allocation);
 
 	char* camDataPointer;
-	vmaMapMemory(_allocator, _cameraBuffer._allocation, (void**)&camDataPointer);
+	vmaMapMemory(_allocator, _cameraBuffer.allocation, (void**)&camDataPointer);
 	const uint32_t camOffset = pad_uniform_buffer_size(sizeof(GPUSceneData)) * frameIndex;
 	camDataPointer += camOffset;
 	memcpy(camDataPointer, &camData, sizeof(GPUCameraData));
-	vmaFlushAllocation(_allocator, _cameraBuffer._allocation, camOffset, sizeof(GPUCameraData));
-	vmaUnmapMemory(_allocator, _cameraBuffer._allocation);
+	vmaFlushAllocation(_allocator, _cameraBuffer.allocation, camOffset, sizeof(GPUCameraData));
+	vmaUnmapMemory(_allocator, _cameraBuffer.allocation);
 	
 	void* objectData;
-	vmaMapMemory(_allocator, get_current_frame().objectBuffer._allocation, &objectData);
+	vmaMapMemory(_allocator, get_current_frame().objectBuffer.allocation, &objectData);
 	GPUObjectData* objectSSBO = (GPUObjectData*)objectData;
 
 	Mesh* lastMesh = nullptr;
@@ -709,15 +708,15 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd,RenderObject* first, int cou
 
 		if (object.mesh != lastMesh) {
 			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(cmd, 0, 1, &object.mesh->_vertexBuffer._buffer, &offset);
+			vkCmdBindVertexBuffers(cmd, 0, 1, &object.mesh->_vertexBuffer.buffer, &offset);
 			lastMesh = object.mesh;
 		}
 		//we can now draw
 		vkCmdDraw(cmd, object.mesh->_vertices.size(), 1, 0, i);
 	}
 
-	vmaFlushAllocation(_allocator, get_current_frame().objectBuffer._allocation, 0, VK_WHOLE_SIZE);
-	vmaUnmapMemory(_allocator, get_current_frame().objectBuffer._allocation);
+	vmaFlushAllocation(_allocator, get_current_frame().objectBuffer.allocation, 0, VK_WHOLE_SIZE);
+	vmaUnmapMemory(_allocator, get_current_frame().objectBuffer.allocation);
 }
 
 AllocatedBuffer VulkanEngine::create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
@@ -738,8 +737,8 @@ AllocatedBuffer VulkanEngine::create_buffer(size_t allocSize, VkBufferUsageFlags
 
 	//allocate the buffer
 	VK_CHECK(vmaCreateBuffer(_allocator, &bufferInfo, &vmaallocInfo,
-		&newBuffer._buffer,
-		&newBuffer._allocation,
+		&newBuffer.buffer,
+		&newBuffer.allocation,
 		nullptr));
 
 	return newBuffer;
