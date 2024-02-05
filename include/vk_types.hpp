@@ -86,32 +86,20 @@ struct GPUCameraData{
 	glm::mat4 viewproj;
 };
 
+struct GPUSceneData {
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::mat4 viewproj;
+    glm::vec4 ambientColor;
+    glm::vec4 sunlightDirection; // w for sun power
+    glm::vec4 sunlightColor;
+};
+
 struct ComputeContext {
 	VkSemaphore _computeSemaphore;
 	VkFence _computeFence;
 	VkCommandPool _commandPool;
 	VkCommandBuffer _commandBuffer;
-};
-
-struct FrameData {
-	VkSemaphore _presentSemaphore, _renderSemaphore;
-	VkFence _renderFence;	
-
-	VkCommandPool _commandPool;
-	VkCommandBuffer _mainCommandBuffer;
-
-	VkDescriptorSet globalDescriptor;
-
-	AllocatedBuffer objectBuffer;
-	VkDescriptorSet objectDescriptor;
-};
-
-struct GPUSceneData {
-	glm::vec4 fogColor; // w is for exponent
-	glm::vec4 fogDistances; //x for min, y for max, zw unused.
-	glm::vec4 ambientColor;
-	glm::vec4 sunlightDirection; //w for sun power
-	glm::vec4 sunlightColor;
 };
 
 struct GPUObjectData{
@@ -152,6 +140,12 @@ struct alignas(16) CloudPushConstants {
   float aniso;
 	float dt;
 };
+
+struct alignas(16) DefualtPushConstants {
+	glm::vec4 lightPos;
+	glm::vec4 camPos;
+};
+
 
 class VulkanEngine;
 class Scene

@@ -36,6 +36,19 @@ class CloudScene;
 
 // 	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 // };
+struct FrameData {
+	VkSemaphore _presentSemaphore, _renderSemaphore;
+	VkFence _renderFence;	
+
+	VkCommandPool _commandPool;
+	VkCommandBuffer _mainCommandBuffer;
+
+	AllocatedBuffer objectBuffer;
+	VkDescriptorSet objectDescriptor;
+
+	DeletionQueue _deletionQueue;
+	DescriptorAllocatorGrowable _frameDescriptors;
+};
 
 class VulkanEngine
 {
@@ -52,6 +65,7 @@ class VulkanEngine
     void draw_objects(VkCommandBuffer cmd,RenderObject* first, int count);
     void init_descriptors();
     void init_imgui();
+    void update_scene();
 
   private:  
     CloudScene* cloudScene;
@@ -76,7 +90,7 @@ class VulkanEngine
     size_t pad_uniform_buffer_size(size_t originalSize);
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
-
+    void destroy_buffer(const AllocatedBuffer& buffer);
 
   public :
     bool _isInitialized{ false };
@@ -116,22 +130,20 @@ class VulkanEngine
     std::unordered_map<std::string,Material> _materials;
     std::unordered_map<std::string,Mesh> _meshes;
 
-    VkDescriptorSetLayout _globalSetLayout;
     VkDescriptorSetLayout _objectSetLayout;
     VkDescriptorSetLayout _singleTextureSetLayout;
     
     VkDescriptorPool _descriptorPool;
 
-    GPUSceneData _sceneParameters;
     AllocatedBuffer _sceneParameterBuffer;
     AllocatedBuffer _cameraBuffer;
     
     UploadContext _uploadContext;
     std::unordered_map<std::string, Texture> _loadedTextures;
 
-    vkutil::DescriptorLayoutCache* _descriptorLayoutCache{nullptr};
-    vkutil::DescriptorAllocator* _descriptorAllocator{nullptr};
-
-
+    DescriptorAllocator globalDescriptorAllocator;
   	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+    DefualtPushConstants defualtConstants;
+    GPUSceneData sceneData;
+    VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 };

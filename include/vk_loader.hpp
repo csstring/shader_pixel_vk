@@ -1,3 +1,5 @@
+#pragma once
+
 #include "vk_types.hpp"
 #include <unordered_map>
 #include <filesystem>

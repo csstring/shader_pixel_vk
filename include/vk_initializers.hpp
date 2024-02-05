@@ -24,4 +24,7 @@ namespace vkinit {
   VkSamplerCreateInfo sampler_create_info(VkFilter filters, VkSamplerAddressMode samplerAddressMode = VK_SAMPLER_ADDRESS_MODE_REPEAT);
   VkWriteDescriptorSet write_descriptor_image(VkDescriptorType type, VkDescriptorSet dstSet, VkDescriptorImageInfo* imageInfo, uint32_t binding);
   VkImageSubresourceRange image_subresource_range(VkImageAspectFlags aspectMask);
+
+  VkPipelineColorBlendAttachmentState enable_blending_additive();
+  VkPipelineColorBlendAttachmentState enable_blending_alphablend();
 }

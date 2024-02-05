@@ -18,7 +18,7 @@ class PipelineBuilder {
     VkPipelineVertexInputStateCreateInfo _vertexInputInfo;
     VkViewport _viewport;
     VkRect2D _scissor;
-
     VkPipeline build_pipeline(VkDevice device, VkRenderPass pass);
+
 };
 
