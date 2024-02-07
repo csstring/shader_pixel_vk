@@ -27,4 +27,6 @@ namespace vkinit {
 
   VkPipelineColorBlendAttachmentState enable_blending_additive();
   VkPipelineColorBlendAttachmentState enable_blending_alphablend();
+  VkViewport viewport_create_info(VkExtent2D extent);
+  VkRect2D scissor_create_info(VkExtent2D extent);
 }

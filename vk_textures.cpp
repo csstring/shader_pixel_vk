@@ -246,6 +246,20 @@ void vkutil::transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkFormat 
 
         sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         destinationStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    }else if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+        imageBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    // Case 10: Transfer Src -> Shader Read Only
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
     else {
       std::cerr << "old layout : " << oldLayout << "new layout : " << newLayout << std::endl;

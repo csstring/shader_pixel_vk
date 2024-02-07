@@ -9,33 +9,42 @@
 constexpr unsigned int FRAME_OVERLAP = 2;
 class CloudScene;
 
-// struct GLTFMetallic_Roughness {
-// 	MaterialPipeline opaquePipeline;
-// 	MaterialPipeline transparentPipeline;
+struct GLTFMetallic_Roughness {
+	MaterialPipeline opaquePipeline;
+	MaterialPipeline transparentPipeline;
 
-// 	VkDescriptorSetLayout materialLayout;
+	VkDescriptorSetLayout materialLayout;
 
-// 	struct MaterialConstants {
-// 		glm::vec4 colorFactors;
-// 		glm::vec4 metal_rough_factors;
-// 		//padding, we need it anyway for uniform buffers
-// 		glm::vec4 extra[14];
-// 	};
+	struct MaterialConstants {
+		glm::vec4 colorFactors;
+		glm::vec4 metal_rough_factors;
+		//padding, we need it anyway for uniform buffers
+		glm::vec4 extra[14];
+	};
 
-// 	struct MaterialResources {
-// 		AllocatedImage colorImage;
-// 		VkSampler colorSampler;
-// 		AllocatedImage metalRoughImage;
-// 		VkSampler metalRoughSampler;
-// 		VkBuffer dataBuffer;
-// 		uint32_t dataBufferOffset;
-// 	};
+	struct MaterialResources {
+		AllocatedImage colorImage;
+		VkSampler colorSampler;
+		AllocatedImage metalRoughImage;
+		VkSampler metalRoughSampler;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
+	};
 
-// 	void build_pipelines(VulkanEngine* engine);
-// 	void clear_resources(VkDevice device);
+	void build_pipelines(VulkanEngine* engine);
+	void clear_resources(VkDevice device);
+  DescriptorWriter writer;
+	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+};
 
-// 	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
-// };
+struct MeshNode : public Node {
+
+	std::shared_ptr<MeshAsset> mesh;
+
+	virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+};
+
+
 struct FrameData {
 	VkSemaphore _presentSemaphore, _renderSemaphore;
 	VkFence _renderFence;	
@@ -85,13 +94,14 @@ class VulkanEngine
     uint32_t constantSize = 0, void* constantPtr = nullptr
     );
     Material* get_material(const std::string& name);
-    AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped);
+    AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     Mesh* get_mesh(const std::string& name);
     size_t pad_uniform_buffer_size(size_t originalSize);
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
     void destroy_buffer(const AllocatedBuffer& buffer);
-
+    void destroy_image(const AllocatedImage& img);
   public :
     bool _isInitialized{ false };
 	  int _frameNumber {0};
@@ -141,9 +151,22 @@ class VulkanEngine
     UploadContext _uploadContext;
     std::unordered_map<std::string, Texture> _loadedTextures;
 
-    DescriptorAllocator globalDescriptorAllocator;
+    DescriptorAllocatorGrowable globalDescriptorAllocator;
   	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
     DefualtPushConstants defualtConstants;
     GPUSceneData sceneData;
     VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
+    MaterialInstance defaultData;
+    GLTFMetallic_Roughness metalRoughMaterial;
+
+    AllocatedImage _whiteImage;
+    AllocatedImage _blackImage;
+    AllocatedImage _greyImage;
+    AllocatedImage _errorCheckerboardImage;
+    VkSampler _defaultSamplerLinear;
+	  VkSampler _defaultSamplerNearest;
+
+    DrawContext mainDrawContext;
+    std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
+    std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
 };
