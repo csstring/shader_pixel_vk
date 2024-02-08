@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include "vk_loader.hpp"  
+#include "ktx.h"
+#include "ktxvulkan.h"
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 class CloudScene;
@@ -12,6 +14,8 @@ class CloudScene;
 struct GLTFMetallic_Roughness {
 	MaterialPipeline opaquePipeline;
 	MaterialPipeline transparentPipeline;
+  MaterialPipeline skyBoxPipeline;
+  MaterialPipeline reflectPipeline;
 
 	VkDescriptorSetLayout materialLayout;
 
@@ -32,7 +36,9 @@ struct GLTFMetallic_Roughness {
 	};
 
 	void build_pipelines(VulkanEngine* engine);
-	void clear_resources(VkDevice device);
+  void buildSkyBoxpipelines(VulkanEngine* engine);
+  // void buildReflectpipelines(VulkanEngine* engine);
+  
   DescriptorWriter writer;
 	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 };
@@ -96,12 +102,14 @@ class VulkanEngine
     Material* get_material(const std::string& name);
     AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    AllocatedImage createCubeImage(ktxTexture* ktxTexture, VkFormat format);
     Mesh* get_mesh(const std::string& name);
     size_t pad_uniform_buffer_size(size_t originalSize);
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
     void destroy_buffer(const AllocatedBuffer& buffer);
     void destroy_image(const AllocatedImage& img);
+
   public :
     bool _isInitialized{ false };
 	  int _frameNumber {0};
@@ -130,8 +138,6 @@ class VulkanEngine
     VkRenderPass _renderPass;
 	  std::vector<VkFramebuffer> _framebuffers;
 
-    int _selectedShader{ 0 };
-
     VkImageView _depthImageView;
     VkFormat _depthFormat;
 	  AllocatedImage _depthImage;
@@ -139,14 +145,6 @@ class VulkanEngine
     std::vector<RenderObject> _renderables;
     std::unordered_map<std::string,Material> _materials;
     std::unordered_map<std::string,Mesh> _meshes;
-
-    VkDescriptorSetLayout _objectSetLayout;
-    VkDescriptorSetLayout _singleTextureSetLayout;
-    
-    VkDescriptorPool _descriptorPool;
-
-    AllocatedBuffer _sceneParameterBuffer;
-    AllocatedBuffer _cameraBuffer;
     
     UploadContext _uploadContext;
     std::unordered_map<std::string, Texture> _loadedTextures;
@@ -163,8 +161,10 @@ class VulkanEngine
     AllocatedImage _blackImage;
     AllocatedImage _greyImage;
     AllocatedImage _errorCheckerboardImage;
+    AllocatedImage _skyBoxImage;
     VkSampler _defaultSamplerLinear;
 	  VkSampler _defaultSamplerNearest;
+    VkSampler _skyBoxSamplerLinear;
 
     DrawContext mainDrawContext;
     std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;

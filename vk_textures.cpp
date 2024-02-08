@@ -166,7 +166,9 @@ void vkutil::copy_image_to_image(VkCommandBuffer cmd, VkImage source, VkImage de
 }
 
 
-void vkutil::transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) 
+void vkutil::transitionImageLayout(
+  VkCommandBuffer cmd, VkImage image, VkFormat format, 
+  VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange)
 {
     VkImageMemoryBarrier imageBarrier{};
     imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -175,8 +177,7 @@ void vkutil::transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkFormat 
     imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     imageBarrier.image = image;
-    VkImageAspectFlags aspectMask = (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-    imageBarrier.subresourceRange = vkinit::image_subresource_range(aspectMask);
+    imageBarrier.subresourceRange = subresourceRange;
 
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
@@ -275,58 +276,3 @@ void vkutil::transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkFormat 
         1, &imageBarrier // Image Memory Barrier count + Pointer
     );
 }
-
-void vkutil::copyImageNotImmediateSubmit(VkCommandBuffer cmd, AllocatedImage source, AllocatedImage destination)
-{
-  //hardcoding VK_IMAGE_LAYOUT_GENERAL
-  vkutil::transitionImageLayout(cmd, source._image, source._imageFormat, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	vkutil::transitionImageLayout(cmd, destination._image, destination._imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	vkutil::copy_image_to_image(cmd, 
-			source._image,
-			destination._image,
-			source._imageExtent,
-			destination._imageExtent);
-	vkutil::transitionImageLayout(cmd, source._image,source._imageFormat, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-	vkutil::transitionImageLayout(cmd, destination._image,destination._imageFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-}
-
-void vkutil::copyImageImmediateSubmit(VulkanEngine& engine, AllocatedImage source, AllocatedImage destination)
-{
-	engine.immediate_submit([&](VkCommandBuffer cmd) {
-  vkutil::transitionImageLayout(cmd, source._image, source._imageFormat, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	vkutil::transitionImageLayout(cmd, destination._image, destination._imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	vkutil::copy_image_to_image(cmd, 
-			source._image,
-			destination._image,
-			source._imageExtent,
-			destination._imageExtent);
-	vkutil::transitionImageLayout(cmd, source._image,source._imageFormat, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-	vkutil::transitionImageLayout(cmd, destination._image,destination._imageFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-	});
-}
-
-void vkutil::copyImageImmediateSubmitTest(VkCommandBuffer cmd, AllocatedImage source, AllocatedImage destination)
-{
-  vkutil::transitionImageLayout(cmd, source._image, source._imageFormat, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	vkutil::transitionImageLayout(cmd, destination._image, destination._imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	vkutil::copy_image_to_image(cmd, 
-			source._image,
-			destination._image,
-			source._imageExtent,
-			destination._imageExtent);
-	vkutil::transitionImageLayout(cmd, source._image,source._imageFormat, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-	vkutil::transitionImageLayout(cmd, destination._image,destination._imageFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-}
-/*
-
-_engine->immediate_submit([=](VkCommandBuffer cmd){
-		vkutil::transitionImageLayout(cmd, _fluidImageBuffer[0][FULIDTEXTUREID::DENSITYID]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-		vkutil::transitionImageLayout(cmd, _fluidDrawImageBuffer._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-		vkutil::copy_image_to_image(cmd, 
-			_fluidImageBuffer[0][FULIDTEXTUREID::DENSITYID]._image,
-			_fluidDrawImageBuffer._image,
-			_fluidImageBuffer[0][FULIDTEXTUREID::DENSITYID]._imageExtent,
-			_fluidDrawImageBuffer._imageExtent);
-		vkutil::transitionImageLayout(cmd, _fluidImageBuffer[0][FULIDTEXTUREID::DENSITYID]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-		vkutil::transitionImageLayout(cmd, _fluidDrawImageBuffer._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-	});*/

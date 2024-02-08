@@ -56,7 +56,7 @@ void DescriptorAllocator::init_pool(VkDevice device, uint32_t maxSets, std::vect
 	pool_info.poolSizeCount = (uint32_t)poolSizes.size();
 	pool_info.pPoolSizes = poolSizes.data();
 
-	vkCreateDescriptorPool(device, &pool_info, nullptr, &pool);
+	VK_CHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &pool));
 }
 
 void DescriptorAllocator::clear_descriptors(VkDevice device)
@@ -150,11 +150,10 @@ void DescriptorAllocatorGrowable::init(VkDevice device, uint32_t maxSets, std::v
     for (auto r : poolRatios) {
         ratios.push_back(r);
     }
-	
+	maxSets = maxSets == 0 ? 1 : maxSets;
     VkDescriptorPool newPool = create_pool(device, maxSets, poolRatios);
 
-    setsPerPool = maxSets * 1.5; //grow it next allocation
-
+    setsPerPool = maxSets * 2; //grow it next allocation
     readyPools.push_back(newPool);
 }
 
@@ -195,7 +194,7 @@ VkDescriptorPool DescriptorAllocatorGrowable::get_pool(VkDevice device)
 	    //need to create a new pool
 	    newPool = create_pool(device, setsPerPool, ratios);
 
-	    setsPerPool = setsPerPool * 1.5;
+	    setsPerPool = setsPerPool * 2;
 	    if (setsPerPool > 4092) {
 		    setsPerPool = 4092;
 	    }
@@ -222,7 +221,7 @@ VkDescriptorPool DescriptorAllocatorGrowable::create_pool(VkDevice device, uint3
 	pool_info.pPoolSizes = poolSizes.data();
 
 	VkDescriptorPool newPool;
-	vkCreateDescriptorPool(device, &pool_info, nullptr, &newPool);
+	VK_CHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &newPool));
     return newPool;
 }
 //< growpool_1
@@ -247,11 +246,12 @@ VkDescriptorSet DescriptorAllocatorGrowable::allocate(VkDevice device, VkDescrip
     if (result == VK_ERROR_OUT_OF_POOL_MEMORY || result == VK_ERROR_FRAGMENTED_POOL) {
 
         fullPools.push_back(poolToUse);
-    
+        std::cerr << "check1" << std::endl;
         poolToUse = get_pool(device);
         allocInfo.descriptorPool = poolToUse;
 
        VK_CHECK( vkAllocateDescriptorSets(device, &allocInfo, &ds));
+       std::cerr << "check12" << std::endl;
     }
   
     readyPools.push_back(poolToUse);

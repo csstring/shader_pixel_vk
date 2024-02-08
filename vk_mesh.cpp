@@ -60,10 +60,10 @@ bool Mesh::load_from_obj(const char* filename)
   return true;
 }
 /*
-  glm::vec3 position;
+ 	glm::vec3 position;
   glm::vec3 normal;
-  glm::vec3 color;
   glm::vec2 uv;
+  glm::vec3 color;
 */
 VertexInputDescription Vertex::get_vertex_description()
 {
@@ -90,21 +90,21 @@ VertexInputDescription Vertex::get_vertex_description()
 	normalAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
 	normalAttribute.offset = offsetof(Vertex, normal);
 	//Color will be stored at Location 2
-	VkVertexInputAttributeDescription colorAttribute = {};
-	colorAttribute.binding = 0;
-	colorAttribute.location = 2;
-	colorAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
-	colorAttribute.offset = offsetof(Vertex, color);
-
 	VkVertexInputAttributeDescription uvAttribute = {};
 	uvAttribute.binding = 0;
-	uvAttribute.location = 3;
+	uvAttribute.location = 2;
 	uvAttribute.format = VK_FORMAT_R32G32_SFLOAT;
 	uvAttribute.offset = offsetof(Vertex, uv);
 
+	VkVertexInputAttributeDescription colorAttribute = {};
+	colorAttribute.binding = 0;
+	colorAttribute.location = 3;
+	colorAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
+	colorAttribute.offset = offsetof(Vertex, color);
+
 	description.attributes.push_back(positionAttribute);
 	description.attributes.push_back(normalAttribute);
-	description.attributes.push_back(colorAttribute);
 	description.attributes.push_back(uvAttribute);
+	description.attributes.push_back(colorAttribute);
 	return description;
 }

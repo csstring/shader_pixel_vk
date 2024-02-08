@@ -96,7 +96,7 @@ void CloudScene::initRenderPipelines()
 
   VkPipelineLayoutCreateInfo textured_pipeline_layout_info = vkinit::pipeline_layout_create_info();
 
-	VkDescriptorSetLayout texturedSetLayouts[] = {_engine->_gpuSceneDataDescriptorLayout, _engine->_objectSetLayout, descriptorSetLayout };
+	VkDescriptorSetLayout texturedSetLayouts[] = {_engine->_gpuSceneDataDescriptorLayout, descriptorSetLayout };//fix me
   VkPushConstantRange push_constant;
 	push_constant.offset = 0;
 	push_constant.size = sizeof(CloudPushConstants);
@@ -104,7 +104,7 @@ void CloudScene::initRenderPipelines()
 	textured_pipeline_layout_info.pPushConstantRanges = &push_constant;
 	textured_pipeline_layout_info.pushConstantRangeCount = 1;
 
-	textured_pipeline_layout_info.setLayoutCount = 3;
+	textured_pipeline_layout_info.setLayoutCount = 3;//fix me
 	textured_pipeline_layout_info.pSetLayouts = texturedSetLayouts;
 	VkPipelineLayout texturedPipeLayout;
 	VK_CHECK(vkCreatePipelineLayout(_engine->_device, &textured_pipeline_layout_info, nullptr, &texturedPipeLayout));
@@ -301,55 +301,55 @@ void CloudScene::uploadCubeMesh()
 {
 	Mesh cube{};
   float lineLength = 1.0f;
-  cube._vertices = {
-    // Front face
-    {{-lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{-lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  // cube._vertices = {
+  //   // Front face
+  //   {{-lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
 
-    // Back face
-    {{-lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{-lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   // Back face
+  //   {{-lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{-lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
 
-    // Left face
-    {{-lineLength, -lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{-lineLength, lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{-lineLength, lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, -lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{-lineLength, -lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   // Left face
+  //   {{-lineLength, -lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{-lineLength, lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{-lineLength, lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{-lineLength, -lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-    // Right face
-    {{lineLength, -lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{lineLength, lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{lineLength, -lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{lineLength, -lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   // Right face
+  //   {{lineLength, -lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{lineLength, lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{lineLength, -lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{lineLength, -lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
 
-    // Top face
-    {{-lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{-lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   // Top face
+  //   {{-lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{-lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-    // Bottom face
-    {{-lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{-lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}
-  };
+  //   // Bottom face
+  //   {{-lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}
+  // };
   _engine->upload_mesh(cube);
 	_engine->_meshes["cube_cloud"] = cube;
 }
@@ -383,8 +383,8 @@ void CloudScene::init_image_buffer()
 		_cloudImageBuffer[0][i] = _engine->create_image(VkExtent3D{ imageWidth, imageHeight, imageDepth }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_SAMPLED_BIT, false);
 		_cloudImageBuffer[1][i] = _engine->create_image(VkExtent3D{ imageWidth, imageHeight, imageDepth }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_SAMPLED_BIT, false);
 		_engine->immediate_submit([=](VkCommandBuffer cmd){
-			vkutil::transitionImageLayout(cmd, _cloudImageBuffer[0][i]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-			vkutil::transitionImageLayout(cmd, _cloudImageBuffer[1][i]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+			vkutil::transitionImageLayout(cmd, _cloudImageBuffer[0][i]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT));
+			vkutil::transitionImageLayout(cmd, _cloudImageBuffer[1][i]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT));
 		});
 	}
 

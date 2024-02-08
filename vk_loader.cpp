@@ -1,7 +1,7 @@
 #include "stb_image.h"
 #include <iostream>
 #include "vk_loader.hpp"
-
+#include <fstream>
 #include "vk_engine.hpp"
 #include "vk_initializers.hpp"
 #include "vk_types.hpp"
@@ -127,12 +127,12 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
   return meshes;
 }
 
-std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image)
+std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& asset, fastgltf::Image& image, std::string dirPath)
 {
     AllocatedImage newImage {};
 
     int width, height, nrChannels;
-
+    int idx = 0;
     std::visit(
         fastgltf::visitor {
             [](auto& arg) {},
@@ -141,10 +141,9 @@ std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& 
                 assert(filePath.uri.isLocalPath()); // We're only capable of loading
                                                     // local files.
 
-                const std::string pathAdd(filePath.uri.path().begin(),
+                const std::string fileName(filePath.uri.path().begin(),
                     filePath.uri.path().end()); // Thanks C++.
-                std::string path = "./assets/models/FlightHelmet/glTF/";
-                path.append(pathAdd);
+                std::string path = dirPath + fileName;
                 std::cerr << path << std::endl;
                 unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
                 if (data) {
@@ -154,7 +153,7 @@ std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& 
                     imagesize.depth = 1;
 
                     newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT,false);
-
+                    idx++;
                     stbi_image_free(data);
                 }
             },
@@ -168,7 +167,7 @@ std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& 
                     imagesize.depth = 1;
 
                     newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT,false);
-
+                    idx++;
                     stbi_image_free(data);
                 }
             },
@@ -192,7 +191,7 @@ std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& 
 
                                        newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
                                            VK_IMAGE_USAGE_SAMPLED_BIT,false);
-
+                                        idx++;
                                        stbi_image_free(data);
                                    }
                                } },
@@ -203,6 +202,7 @@ std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& 
 
     // if any of the attempts to load the data failed, we havent written the image
     // so handle is null
+    std::cerr <<idx << std::endl;
     if (newImage._image == VK_NULL_HANDLE) {
         std::cerr << "image load faile execption" << std::endl;
         return {};
@@ -243,8 +243,9 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter)
     }
 }
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string_view filePath)
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string dirPath, std::string fileName)
 {
+    const std::string filePath = dirPath + fileName;
     std::cout << "Loading GLTF: "<<  filePath << std::endl;
 
     std::shared_ptr<LoadedGLTF> scene = std::make_shared<LoadedGLTF>();
@@ -286,11 +287,11 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
     }
 
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = { 
-      { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
+      { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1 },
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 } };
 
-    file.descriptorPool.init(engine->_device, gltf.materials.size(), sizes);
+
 
     for (fastgltf::Sampler& sampler : gltf.samplers) {
 
@@ -305,21 +306,19 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
 
         VkSampler newSampler;
         vkCreateSampler(engine->_device, &sampl, nullptr, &newSampler);
-
         file.samplers.push_back(newSampler);
     }
-
     std::vector<std::shared_ptr<MeshAsset>> meshes;
     std::vector<std::shared_ptr<Node>> nodes;
     std::vector<AllocatedImage> images;
     std::vector<std::shared_ptr<GLTFMaterial>> materials;
 
     for (fastgltf::Image& image : gltf.images) {
-        std::optional<AllocatedImage> img = load_image(engine, gltf, image);
-
+        std::optional<AllocatedImage> img = load_image(engine, gltf, image, dirPath);
         if (img.has_value()) {
             images.push_back(*img);
-            file.images[image.name.c_str()] = *img;
+            file.images.push_back(*img);
+
         } else {
             // we failed to load, so lets give the slot a default white texture to not
             // completely break loading
@@ -327,67 +326,93 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
             std::cout << "gltf failed to load texture " << image.name << std::endl;
         }
     }
-
 //> load_buffer
     // create buffer to hold the material data
-    file.materialDataBuffer = engine->create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants) * gltf.materials.size(),
+    if (gltf.materials.size()){
+        file.descriptorPool.init(engine->_device, gltf.materials.size(), sizes);
+        file.materialDataBuffer = engine->create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants) * gltf.materials.size(),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        int data_index = 0;
+        GLTFMetallic_Roughness::MaterialConstants* sceneMaterialConstants = (GLTFMetallic_Roughness::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
+        for (fastgltf::Material& mat : gltf.materials) {
+            std::shared_ptr<GLTFMaterial> newMat = std::make_shared<GLTFMaterial>();
+            materials.push_back(newMat);
+            file.materials[mat.name.c_str()] = newMat;
+
+            GLTFMetallic_Roughness::MaterialConstants constants;
+            constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
+            constants.colorFactors.y = mat.pbrData.baseColorFactor[1];
+            constants.colorFactors.z = mat.pbrData.baseColorFactor[2];
+            constants.colorFactors.w = mat.pbrData.baseColorFactor[3];
+            constants.metal_rough_factors.x = mat.pbrData.metallicFactor;
+            constants.metal_rough_factors.y = mat.pbrData.roughnessFactor;
+            // write material parameters to buffer
+            sceneMaterialConstants[data_index] = constants;
+
+            // MaterialPass passType = MaterialPass::MainColor;
+            // if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
+            //     passType = MaterialPass::Transparent;
+            // }
+            MaterialPass passType = MaterialPass::SkyBox;
+            GLTFMetallic_Roughness::MaterialResources materialResources;
+            // default the material textures
+            // materialResources.colorImage = engine->_errorCheckerboardImage;
+            // materialResources.colorSampler = engine->_defaultSamplerLinear;
+            // materialResources.metalRoughImage = engine->_errorCheckerboardImage;
+            // materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
+            materialResources.colorImage = engine->_skyBoxImage;
+            materialResources.colorSampler = engine->_skyBoxSamplerLinear;
+            materialResources.metalRoughImage = engine->_skyBoxImage;
+            materialResources.metalRoughSampler = engine->_skyBoxSamplerLinear;
+            // set the uniform buffer for the material data
+            materialResources.dataBuffer = file.materialDataBuffer.buffer;
+            materialResources.dataBufferOffset = data_index * sizeof(GLTFMetallic_Roughness::MaterialConstants);
+            // grab textures from gltf file
+
+            if (mat.pbrData.baseColorTexture.has_value()) {
+                auto& baseColorTexture = mat.pbrData.baseColorTexture.value();
+                if (baseColorTexture.textureIndex < gltf.textures.size()) {
+                    auto& texture = gltf.textures[baseColorTexture.textureIndex];
+                    if (texture.imageIndex.has_value() && texture.imageIndex.value() < images.size()) {
+                        materialResources.colorImage = images[texture.imageIndex.value()];
+                    }
+                    if (texture.samplerIndex.has_value() && texture.samplerIndex.value() < file.samplers.size()) {
+                        materialResources.colorSampler = file.samplers[texture.samplerIndex.value()];
+                    }
+                }
+            }
+            std::cerr <<"load_imwrite_materialage" << std::endl;
+            newMat->data = engine->metalRoughMaterial.write_material(engine->_device, passType, materialResources, file.descriptorPool);
+
+            data_index++;
+        }
+    } else {
+        file.descriptorPool.init(engine->_device, 1, sizes);
+        file.materialDataBuffer = engine->create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants) * 1,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    int data_index = 0;
-    GLTFMetallic_Roughness::MaterialConstants* sceneMaterialConstants = (GLTFMetallic_Roughness::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
-    for (fastgltf::Material& mat : gltf.materials) {
+        GLTFMetallic_Roughness::MaterialConstants* sceneMaterialConstants = (GLTFMetallic_Roughness::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
+
         std::shared_ptr<GLTFMaterial> newMat = std::make_shared<GLTFMaterial>();
         materials.push_back(newMat);
-        file.materials[mat.name.c_str()] = newMat;
+        file.materials["emptyMat"] = newMat;
 
         GLTFMetallic_Roughness::MaterialConstants constants;
-        constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
-        constants.colorFactors.y = mat.pbrData.baseColorFactor[1];
-        constants.colorFactors.z = mat.pbrData.baseColorFactor[2];
-        constants.colorFactors.w = mat.pbrData.baseColorFactor[3];
-        constants.metal_rough_factors.x = mat.pbrData.metallicFactor;
-        constants.metal_rough_factors.y = mat.pbrData.roughnessFactor;
-        // write material parameters to buffer
-        sceneMaterialConstants[data_index] = constants;
+        constants.colorFactors = glm::vec4(1.0f);
+        constants.metal_rough_factors = glm::vec4(0.0f);
+        sceneMaterialConstants[0] = constants;
 
-        MaterialPass passType = MaterialPass::MainColor;
-        if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
-            passType = MaterialPass::Transparent;
-        }
+        MaterialPass passType = MaterialPass::SkyBox;
         GLTFMetallic_Roughness::MaterialResources materialResources;
         // default the material textures
-        materialResources.colorImage = engine->_whiteImage;
-        materialResources.colorSampler = engine->_defaultSamplerLinear;
-        materialResources.metalRoughImage = engine->_whiteImage;
-        materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
+        materialResources.colorImage = engine->_skyBoxImage;
+        materialResources.colorSampler = engine->_skyBoxSamplerLinear;
+        materialResources.metalRoughImage = engine->_skyBoxImage;
+        materialResources.metalRoughSampler = engine->_skyBoxSamplerLinear;
 
         // set the uniform buffer for the material data
         materialResources.dataBuffer = file.materialDataBuffer.buffer;
-        materialResources.dataBufferOffset = data_index * sizeof(GLTFMetallic_Roughness::MaterialConstants);
-        // grab textures from gltf file
-        //crush crush crush crush
-        if (mat.pbrData.baseColorTexture.has_value()) {
-            auto& baseColorTexture = mat.pbrData.baseColorTexture.value();
-            if (baseColorTexture.textureIndex < gltf.textures.size()) {
-                auto& texture = gltf.textures[baseColorTexture.textureIndex];
-                if (texture.imageIndex.has_value() && texture.imageIndex.value() < images.size()) {
-                    materialResources.colorImage = images[texture.imageIndex.value()];
-                }
-                if (texture.samplerIndex.has_value() && texture.samplerIndex.value() < file.samplers.size()) {
-                    materialResources.colorSampler = file.samplers[texture.samplerIndex.value()];
-                }
-            }
-        }
-        // if (mat.pbrData.baseColorTexture.has_value()) {
-        //     size_t img = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].imageIndex.value();
-        //     size_t sampler = gltf.textures[mat.pbrData.baseColorTexture.value().textureIndex].samplerIndex.value();
-
-        //     materialResources.colorImage = images[img];
-        //     materialResources.colorSampler = file.samplers[sampler];
-        // } 
-        // build material
+        materialResources.dataBufferOffset = 0;
         newMat->data = engine->metalRoughMaterial.write_material(engine->_device, passType, materialResources, file.descriptorPool);
-
-        data_index++;
     }
     vmaFlushAllocation(engine->_allocator, file.materialDataBuffer.allocation, 0, VK_WHOLE_SIZE);
     std::vector<uint32_t> indices;
@@ -485,10 +510,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
             newSurface.bounds.sphereRadius = glm::length(newSurface.bounds.extents);
             newmesh->surfaces.push_back(newSurface);
         }
-
         newmesh->meshBuffers = engine->uploadMeshBuffers(indices, vertices);
     }
-        std::cerr << "gltf load end" << std::endl;
     for (fastgltf::Node& node : gltf.nodes) {
         std::shared_ptr<Node> newNode;
 
@@ -552,18 +575,33 @@ void LoadedGLTF::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
     }
 }
 
+void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format)
+{
+    ktxResult result;
+    ktxTexture* ktxTexture;
+
+    const std::string filePath = dirPath + fileName;
+    std::ifstream f(filePath.c_str());
+    if (f.fail()){
+        std::cerr << "load cube file path fail : " << filePath << std::endl;
+    }
+    result = ktxTexture_CreateFromNamedFile(filePath.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
+    assert(result == KTX_SUCCESS);
+
+    engine->_skyBoxImage = engine->createCubeImage(ktxTexture, format);
+}   
 
 void LoadedGLTF::clearAll()
 {
     VkDevice dv = creator->_device;
-
+    std::cerr << "claerall call" << std::endl;
     for (auto& [k, v] : meshes) {
 
         creator->destroy_buffer(v->meshBuffers.indexBuffer);
         creator->destroy_buffer(v->meshBuffers.vertexBuffer);
     }
 
-    for (auto& [k, v] : images) {
+    for (auto& v : images) {
 
         if (v._image == creator->_errorCheckerboardImage._image) {
             // dont destroy the default images
@@ -576,10 +614,8 @@ void LoadedGLTF::clearAll()
         vkDestroySampler(dv, sampler, nullptr);
     }
 
-    auto materialBuffer = materialDataBuffer;
-    auto samplersToDestroy = samplers;
+    // auto samplersToDestroy = samplers;
+    creator->destroy_buffer(materialDataBuffer);
 
     descriptorPool.destroy_pools(dv);
-
-    creator->destroy_buffer(materialBuffer);
 }

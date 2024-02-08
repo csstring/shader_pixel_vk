@@ -11,8 +11,8 @@ layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer {
 
 layout (location = 0) in vec3 vPosition;
 layout (location = 1) in vec3 vNormal;
-layout (location = 2) in vec3 vColor;
-layout (location = 3) in vec2 uv;
+layout (location = 2) in vec3 uv;
+layout (location = 3) in vec2 vColor;
 
 layout (location = 0) out vec3 modelPos;
 layout (location = 1) out mat4 worldInv;
@@ -25,6 +25,7 @@ layout(set = 0, binding = 0) uniform  CameraBuffer{
 	vec4 ambientColor;
 	vec4 sunlightDirection;
 	vec4 sunlightColor;
+	vec4 viewPos;
 } cameraData;
 
 
