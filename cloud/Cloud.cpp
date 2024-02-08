@@ -47,38 +47,30 @@ void CloudScene::initRenderPipelines()
   VkDescriptorSet descriptorSetFirst, descriptorSetSecond;
 	//init descriptor
 	{
-    VkDescriptorImageInfo DENSITYID{};
-    DENSITYID.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    DENSITYID.imageView = _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView;
-    DENSITYID.sampler = _defaultSamplerLinear;
-
-    VkDescriptorImageInfo LIGHTID{};
-    LIGHTID.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    LIGHTID.imageView = _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT]._imageView;
-    LIGHTID.sampler = _defaultSamplerLinear;
-    vkutil::DescriptorBuilder::begin(_engine->_descriptorLayoutCache, _engine->_descriptorAllocator).
-                        bind_image(0, &DENSITYID, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  VK_SHADER_STAGE_FRAGMENT_BIT).
-                        bind_image(1, &LIGHTID, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  VK_SHADER_STAGE_FRAGMENT_BIT).
-                        build(descriptorSetFirst, descriptorSetLayout);
+		DescriptorLayoutBuilder builder;
+    builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		builder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    descriptorSetLayout = builder.build(_engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	}
+	descriptorSetFirst = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
+	descriptorSetSecond = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
+		
+	{
+    DescriptorWriter writer;	
+		writer.write_image(0, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.write_image(1, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.update_set(_engine->_device, descriptorSetFirst);
   }
 
-  {
-    VkDescriptorImageInfo DENSITYID{};
-    DENSITYID.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    DENSITYID.imageView = _cloudImageBuffer[1][CLOUDTEXTUREID::CLOUDDENSITY]._imageView;
-    DENSITYID.sampler = _defaultSamplerLinear;
-
-    VkDescriptorImageInfo LIGHTID{};
-    LIGHTID.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    LIGHTID.imageView = _cloudImageBuffer[1][CLOUDTEXTUREID::CLOUDLIGHT]._imageView;
-    LIGHTID.sampler = _defaultSamplerLinear;
-    
-    vkutil::DescriptorBuilder::begin(_engine->_descriptorLayoutCache, _engine->_descriptorAllocator).
-                        bind_image(0, &DENSITYID, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  VK_SHADER_STAGE_FRAGMENT_BIT).
-                        bind_image(1, &LIGHTID, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  VK_SHADER_STAGE_FRAGMENT_BIT).
-                        build(descriptorSetSecond, descriptorSetLayout);
+	{
+    DescriptorWriter writer;	
+		writer.write_image(0, _cloudImageBuffer[1][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.write_image(1, _cloudImageBuffer[1][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.update_set(_engine->_device, descriptorSetSecond);
   }
-
+	_deletionQueue.push_function([=]() {
+        vkDestroyDescriptorSetLayout(_engine->_device, descriptorSetLayout, nullptr);
+  });
 	//init pipeline
 	{
 	PipelineBuilder pipelineBuilder;
@@ -100,12 +92,11 @@ void CloudScene::initRenderPipelines()
 
 	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
 	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info();
-	//a single blend attachment with no blending and writing to RGBA
 	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state();
 
   VkPipelineLayoutCreateInfo textured_pipeline_layout_info = vkinit::pipeline_layout_create_info();
 
-	VkDescriptorSetLayout texturedSetLayouts[] = {_engine->_globalSetLayout, _engine->_objectSetLayout, descriptorSetLayout };
+	VkDescriptorSetLayout texturedSetLayouts[] = {_engine->_gpuSceneDataDescriptorLayout, descriptorSetLayout };//fix me
   VkPushConstantRange push_constant;
 	push_constant.offset = 0;
 	push_constant.size = sizeof(CloudPushConstants);
@@ -113,7 +104,7 @@ void CloudScene::initRenderPipelines()
 	textured_pipeline_layout_info.pPushConstantRanges = &push_constant;
 	textured_pipeline_layout_info.pushConstantRangeCount = 1;
 
-	textured_pipeline_layout_info.setLayoutCount = 3;
+	textured_pipeline_layout_info.setLayoutCount = 3;//fix me
 	textured_pipeline_layout_info.pSetLayouts = texturedSetLayouts;
 	VkPipelineLayout texturedPipeLayout;
 	VK_CHECK(vkCreatePipelineLayout(_engine->_device, &textured_pipeline_layout_info, nullptr, &texturedPipeLayout));
@@ -168,14 +159,19 @@ void CloudScene::initGenCloudPipelines()
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSet descriptorSet;
 	{
-    VkDescriptorImageInfo DENSITYID{};
-    DENSITYID.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    DENSITYID.imageView = _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView;
-
-    vkutil::DescriptorBuilder::begin(_engine->_descriptorLayoutCache, _engine->_descriptorAllocator).
-                        bind_image(0, &DENSITYID, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  VK_SHADER_STAGE_COMPUTE_BIT).
-                        build(descriptorSet, descriptorSetLayout);
+		DescriptorLayoutBuilder builder;
+    builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    descriptorSetLayout = builder.build(_engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
+	}
+	descriptorSet = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
+	{
+    DescriptorWriter writer;	
+		writer.write_image(0, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, nullptr , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    writer.update_set(_engine->_device, descriptorSet);
   }
+	_deletionQueue.push_function([=]() {
+        vkDestroyDescriptorSetLayout(_engine->_device, descriptorSetLayout, nullptr);
+  });
 	{
 	VkShaderModule compShader;
 	if (!vkutil::load_shader_module("./spv/cloudDensity.comp.spv", _engine->_device, &compShader)){
@@ -230,20 +226,21 @@ void CloudScene::initMakeLightTexturePipelines()
   VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSet descriptorSet;
 	{
-    VkDescriptorImageInfo DENSITYID{};
-    DENSITYID.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    DENSITYID.imageView = _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView;
-    DENSITYID.sampler = _defaultSamplerLinear;
-
-    VkDescriptorImageInfo LIGHTID{};
-    LIGHTID.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    LIGHTID.imageView = _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT]._imageView;
-
-    vkutil::DescriptorBuilder::begin(_engine->_descriptorLayoutCache, _engine->_descriptorAllocator).
-                        bind_image(0, &DENSITYID, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  VK_SHADER_STAGE_COMPUTE_BIT).
-                        bind_image(1, &LIGHTID, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  VK_SHADER_STAGE_COMPUTE_BIT).
-                        build(descriptorSet, descriptorSetLayout);
+		DescriptorLayoutBuilder builder;
+    builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    descriptorSetLayout = builder.build(_engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
+	}
+	descriptorSet = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
+	{
+    DescriptorWriter writer;	
+		writer.write_image(0, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.write_image(1, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, nullptr , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    writer.update_set(_engine->_device, descriptorSet);
   }
+	_deletionQueue.push_function([=]() {
+        vkDestroyDescriptorSetLayout(_engine->_device, descriptorSetLayout, nullptr);
+  });
   {
   VkShaderModule compShader;
 	if (!vkutil::load_shader_module("./spv/cloudLighting.comp.spv", _engine->_device, &compShader)){
@@ -304,55 +301,55 @@ void CloudScene::uploadCubeMesh()
 {
 	Mesh cube{};
   float lineLength = 1.0f;
-  cube._vertices = {
-    // Front face
-    {{-lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{-lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  // cube._vertices = {
+  //   // Front face
+  //   {{-lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, lineLength}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
 
-    // Back face
-    {{-lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{-lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   // Back face
+  //   {{-lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{-lineLength, lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, -lineLength}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
 
-    // Left face
-    {{-lineLength, -lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{-lineLength, lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{-lineLength, lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, -lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{-lineLength, -lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   // Left face
+  //   {{-lineLength, -lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{-lineLength, lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{-lineLength, lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, -lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{-lineLength, -lineLength, lineLength}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-    // Right face
-    {{lineLength, -lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{lineLength, lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{lineLength, -lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{lineLength, -lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   // Right face
+  //   {{lineLength, -lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{lineLength, lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{lineLength, -lineLength, lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{lineLength, -lineLength, -lineLength}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
 
-    // Top face
-    {{-lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{-lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   // Top face
+  //   {{-lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{-lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, lineLength, lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, lineLength, -lineLength}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-    // Bottom face
-    {{-lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-    {{-lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-    {{-lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}
-  };
+  //   // Bottom face
+  //   {{-lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //   {{lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //   {{lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //   {{-lineLength, -lineLength, -lineLength}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}
+  // };
   _engine->upload_mesh(cube);
 	_engine->_meshes["cube_cloud"] = cube;
 }
@@ -386,8 +383,8 @@ void CloudScene::init_image_buffer()
 		_cloudImageBuffer[0][i] = _engine->create_image(VkExtent3D{ imageWidth, imageHeight, imageDepth }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_SAMPLED_BIT, false);
 		_cloudImageBuffer[1][i] = _engine->create_image(VkExtent3D{ imageWidth, imageHeight, imageDepth }, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_SAMPLED_BIT, false);
 		_engine->immediate_submit([=](VkCommandBuffer cmd){
-			vkutil::transitionImageLayout(cmd, _cloudImageBuffer[0][i]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-			vkutil::transitionImageLayout(cmd, _cloudImageBuffer[1][i]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+			vkutil::transitionImageLayout(cmd, _cloudImageBuffer[0][i]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT));
+			vkutil::transitionImageLayout(cmd, _cloudImageBuffer[1][i]._image,VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT));
 		});
 	}
 
@@ -460,25 +457,8 @@ void CloudScene::update(float dt, uint32_t frameidx)
 		constants.cursorPos.w = 1.0f;
 	}
 
-	// VK_CHECK(vkWaitForFences(_engine->_device, 1, &_computeContext._computeFence, true, 1000000000));
-	// VK_CHECK(vkResetFences(_engine->_device, 1, &_computeContext._computeFence));
-	// VK_CHECK(vkResetCommandBuffer(_computeContext._commandBuffer, 0));
-	// VkCommandBuffer cmd = _computeContext._commandBuffer;
-	// VkCommandBufferBeginInfo beginInfo{};
-	// beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-	// VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
-
 	makeLightTexture();
   genCloud();
-
-	// VK_CHECK(vkEndCommandBuffer(cmd));
-
-	// VkSubmitInfo submitInfo{};
-	// submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	// submitInfo.commandBufferCount = 1;
-  // submitInfo.pCommandBuffers = &_computeContext._commandBuffer;
-	// VK_CHECK(vkQueueSubmit(_engine->_graphicsQueue, 1, &submitInfo, _computeContext._computeFence));
 
 }
 

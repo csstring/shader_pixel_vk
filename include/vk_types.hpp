@@ -24,6 +24,7 @@
 struct AllocatedBuffer {
     VkBuffer buffer;
     VmaAllocation allocation;
+    VmaAllocationInfo info;
 };
 
 struct AllocatedImage {
@@ -73,17 +74,45 @@ struct Material {
 	VkPipelineLayout pipelineLayout;
 };
 
-struct Mesh;
-struct RenderObject {
-	Mesh* mesh;
-	Material* material;
-	glm::mat4 transformMatrix;
+enum class MaterialPass :uint8_t {
+    MainColor,
+    Transparent,
+    SkyBox,
+    Reflect,
+    Other
+};
+struct MaterialPipeline {
+	VkPipeline pipeline;
+	VkPipelineLayout layout;
 };
 
-struct GPUCameraData{
-	glm::mat4 view;
-	glm::mat4 proj;
-	glm::mat4 viewproj;
+struct MaterialInstance {
+    MaterialPipeline* pipeline;
+    VkDescriptorSet materialSet;
+    MaterialPass passType;
+};
+
+struct RenderObject {
+	uint32_t indexCount;
+	uint32_t firstIndex;
+	VkBuffer indexBuffer;
+	VkBuffer vertexBuffer;
+
+	MaterialInstance* material;
+
+	glm::mat4 transform;
+};
+
+
+
+struct GPUSceneData {
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::mat4 viewproj;
+    glm::vec4 ambientColor;
+    glm::vec4 sunlightDirection; // w for sun power
+    glm::vec4 sunlightColor;
+    glm::vec4 viewPos;
 };
 
 struct ComputeContext {
@@ -91,27 +120,6 @@ struct ComputeContext {
 	VkFence _computeFence;
 	VkCommandPool _commandPool;
 	VkCommandBuffer _commandBuffer;
-};
-
-struct FrameData {
-	VkSemaphore _presentSemaphore, _renderSemaphore;
-	VkFence _renderFence;	
-
-	VkCommandPool _commandPool;
-	VkCommandBuffer _mainCommandBuffer;
-
-	VkDescriptorSet globalDescriptor;
-
-	AllocatedBuffer objectBuffer;
-	VkDescriptorSet objectDescriptor;
-};
-
-struct GPUSceneData {
-	glm::vec4 fogColor; // w is for exponent
-	glm::vec4 fogDistances; //x for min, y for max, zw unused.
-	glm::vec4 ambientColor;
-	glm::vec4 sunlightDirection; //w for sun power
-	glm::vec4 sunlightColor;
 };
 
 struct GPUObjectData{
@@ -125,20 +133,11 @@ struct UploadContext {
 	VkCommandBuffer _commandBuffer;
 };
 
-
 struct Texture {
 	AllocatedImage image;
 	VkImageView imageView;
 	VkExtent3D imageExtent;
   VkFormat imageFormat;
-};
-
-struct FluidPushConstants {
-	glm::vec4 velocity;
-	glm::vec4 color;
-	glm::vec4 cursorPos;
-	float viscosity;
-	float dt;
 };
 
 struct alignas(16) CloudPushConstants {
@@ -151,6 +150,15 @@ struct alignas(16) CloudPushConstants {
   float densityAbsorption;
   float aniso;
 	float dt;
+};
+
+struct alignas(16) DefualtPushConstants {
+	glm::vec4 lightPos;
+	glm::vec4 camPos;
+};
+
+struct GPUDrawPushConstants {
+    glm::mat4 worldMatrix;
 };
 
 class VulkanEngine;
@@ -167,40 +175,38 @@ class Scene
     virtual ~Scene(){};
 };
 
-// struct DrawContext {
-//     std::vector<RenderObjectTest> OpaqueSurfaces;
-//     std::vector<RenderObjectTest> TransparentSurfaces;
-// };
+struct DrawContext {
+    std::vector<RenderObject> OpaqueSurfaces;
+    std::vector<RenderObject> TransparentSurfaces;
+};
 
-// class IRenderable {
+class IRenderable {
 
-//     virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
-// };
+    virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
+};
 
-// enum class MaterialPass :uint8_t {
-//     MainColor,
-//     Transparent,
-//     Other
-// };
+struct Node : public IRenderable {
 
-// struct MaterialPipeline {
-// 	VkPipeline pipeline;
-// 	VkPipelineLayout layout;
-// };
+    // parent pointer must be a weak pointer to avoid circular dependencies
+    std::weak_ptr<Node> parent;
+    std::vector<std::shared_ptr<Node>> children;
 
-// struct MaterialInstance {
-//     MaterialPipeline* pipeline;
-//     VkDescriptorSet materialSet;
-//     MaterialPass passType;
-// };
+    glm::mat4 localTransform;
+    glm::mat4 worldTransform;
 
-// struct RenderObjectTest {
-//     uint32_t indexCount;
-//     uint32_t firstIndex;
+    void refreshTransform(const glm::mat4& parentMatrix)
+    {
+        worldTransform = parentMatrix * localTransform;
+        for (auto c : children) {
+            c->refreshTransform(worldTransform);
+        }
+    }
 
-//     VkBuffer indexBuffer;
-//     VkBuffer vertexBuffer;
-//     MaterialInstance* material;
-
-//     glm::mat4 transform;
-// };
+    virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx)
+    {
+        // draw children
+        for (auto& c : children) {
+            c->Draw(topMatrix, ctx);
+        }
+    }
+};

@@ -36,7 +36,7 @@ class CloudScene : public Scene
     uint32_t _curFrameIdx{0};
     AllocatedImage _cloudImageBuffer[2][2];
     CloudPushConstants constants;
-
+    
     void initialize(VulkanEngine* engine);
 
     void uploadCubeMesh();

@@ -5,37 +5,65 @@
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include "vk_loader.hpp"  
+#include "ktx.h"
+#include "ktxvulkan.h"
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 class CloudScene;
 
-// struct GLTFMetallic_Roughness {
-// 	MaterialPipeline opaquePipeline;
-// 	MaterialPipeline transparentPipeline;
+struct GLTFMetallic_Roughness {
+	MaterialPipeline opaquePipeline;
+	MaterialPipeline transparentPipeline;
+  MaterialPipeline skyBoxPipeline;
+  MaterialPipeline reflectPipeline;
 
-// 	VkDescriptorSetLayout materialLayout;
+	VkDescriptorSetLayout materialLayout;
 
-// 	struct MaterialConstants {
-// 		glm::vec4 colorFactors;
-// 		glm::vec4 metal_rough_factors;
-// 		//padding, we need it anyway for uniform buffers
-// 		glm::vec4 extra[14];
-// 	};
+	struct MaterialConstants {
+		glm::vec4 colorFactors;
+		glm::vec4 metal_rough_factors;
+		//padding, we need it anyway for uniform buffers
+		glm::vec4 extra[14];
+	};
 
-// 	struct MaterialResources {
-// 		AllocatedImage colorImage;
-// 		VkSampler colorSampler;
-// 		AllocatedImage metalRoughImage;
-// 		VkSampler metalRoughSampler;
-// 		VkBuffer dataBuffer;
-// 		uint32_t dataBufferOffset;
-// 	};
+	struct MaterialResources {
+		AllocatedImage colorImage;
+		VkSampler colorSampler;
+		AllocatedImage metalRoughImage;
+		VkSampler metalRoughSampler;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
+	};
 
-// 	void build_pipelines(VulkanEngine* engine);
-// 	void clear_resources(VkDevice device);
+	void build_pipelines(VulkanEngine* engine);
+  void buildSkyBoxpipelines(VulkanEngine* engine);
+  // void buildReflectpipelines(VulkanEngine* engine);
+  
+  DescriptorWriter writer;
+	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+};
 
-// 	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
-// };
+struct MeshNode : public Node {
+
+	std::shared_ptr<MeshAsset> mesh;
+
+	virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+};
+
+
+struct FrameData {
+	VkSemaphore _presentSemaphore, _renderSemaphore;
+	VkFence _renderFence;	
+
+	VkCommandPool _commandPool;
+	VkCommandBuffer _mainCommandBuffer;
+
+	AllocatedBuffer objectBuffer;
+	VkDescriptorSet objectDescriptor;
+
+	DeletionQueue _deletionQueue;
+	DescriptorAllocatorGrowable _frameDescriptors;
+};
 
 class VulkanEngine
 {
@@ -52,6 +80,7 @@ class VulkanEngine
     void draw_objects(VkCommandBuffer cmd,RenderObject* first, int count);
     void init_descriptors();
     void init_imgui();
+    void update_scene();
 
   private:  
     CloudScene* cloudScene;
@@ -71,12 +100,15 @@ class VulkanEngine
     uint32_t constantSize = 0, void* constantPtr = nullptr
     );
     Material* get_material(const std::string& name);
-    AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped);
+    AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    AllocatedImage createCubeImage(ktxTexture* ktxTexture, VkFormat format);
     Mesh* get_mesh(const std::string& name);
     size_t pad_uniform_buffer_size(size_t originalSize);
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
-
+    void destroy_buffer(const AllocatedBuffer& buffer);
+    void destroy_image(const AllocatedImage& img);
 
   public :
     bool _isInitialized{ false };
@@ -106,8 +138,6 @@ class VulkanEngine
     VkRenderPass _renderPass;
 	  std::vector<VkFramebuffer> _framebuffers;
 
-    int _selectedShader{ 0 };
-
     VkImageView _depthImageView;
     VkFormat _depthFormat;
 	  AllocatedImage _depthImage;
@@ -115,23 +145,28 @@ class VulkanEngine
     std::vector<RenderObject> _renderables;
     std::unordered_map<std::string,Material> _materials;
     std::unordered_map<std::string,Mesh> _meshes;
-
-    VkDescriptorSetLayout _globalSetLayout;
-    VkDescriptorSetLayout _objectSetLayout;
-    VkDescriptorSetLayout _singleTextureSetLayout;
-    
-    VkDescriptorPool _descriptorPool;
-
-    GPUSceneData _sceneParameters;
-    AllocatedBuffer _sceneParameterBuffer;
-    AllocatedBuffer _cameraBuffer;
     
     UploadContext _uploadContext;
     std::unordered_map<std::string, Texture> _loadedTextures;
 
-    vkutil::DescriptorLayoutCache* _descriptorLayoutCache{nullptr};
-    vkutil::DescriptorAllocator* _descriptorAllocator{nullptr};
-
-
+    DescriptorAllocatorGrowable globalDescriptorAllocator;
   	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+    DefualtPushConstants defualtConstants;
+    GPUSceneData sceneData;
+    VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
+    MaterialInstance defaultData;
+    GLTFMetallic_Roughness metalRoughMaterial;
+
+    AllocatedImage _whiteImage;
+    AllocatedImage _blackImage;
+    AllocatedImage _greyImage;
+    AllocatedImage _errorCheckerboardImage;
+    AllocatedImage _skyBoxImage;
+    VkSampler _defaultSamplerLinear;
+	  VkSampler _defaultSamplerNearest;
+    VkSampler _skyBoxSamplerLinear;
+
+    DrawContext mainDrawContext;
+    std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
+    std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
 };

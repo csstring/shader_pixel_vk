@@ -42,6 +42,7 @@ bool vkutil::load_shader_module(const char* filePath,
     return true;
 }
 
+
 VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 {
     VkPipelineViewportStateCreateInfo viewportState = {};
@@ -93,3 +94,4 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 		return newPipeline;
 	}
 }
+

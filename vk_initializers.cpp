@@ -113,6 +113,34 @@ VkPipelineColorBlendAttachmentState vkinit::color_blend_attachment_state()
 	return colorBlendAttachment;
 }
 
+VkPipelineColorBlendAttachmentState vkinit::enable_blending_additive()
+{
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+  colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  colorBlendAttachment.blendEnable = VK_TRUE;
+	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+	return colorBlendAttachment;
+}
+
+VkPipelineColorBlendAttachmentState vkinit::enable_blending_alphablend()
+{
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_TRUE;
+	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+	return colorBlendAttachment;
+}
+
 VkPipelineLayoutCreateInfo vkinit::pipeline_layout_create_info() 
 {
 	VkPipelineLayoutCreateInfo info{};
@@ -193,12 +221,13 @@ VkPipelineDepthStencilStateCreateInfo vkinit::depth_stencil_create_info(bool bDe
 
 	info.depthTestEnable = bDepthTest ? VK_TRUE : VK_FALSE;
 	info.depthWriteEnable = bDepthWrite ? VK_TRUE : VK_FALSE;
-	info.depthCompareOp = bDepthTest ? compareOp : VK_COMPARE_OP_ALWAYS;
+	info.depthCompareOp = bDepthTest ? compareOp : VK_COMPARE_OP_NEVER;
 	info.depthBoundsTestEnable = VK_FALSE;
-	info.minDepthBounds = 0.0f; // Optional
-	info.maxDepthBounds = 1.0f; // Optional
+	// info.minDepthBounds = 0.0f; // Optional
+	// info.maxDepthBounds = 1.0f; // Optional
 	info.stencilTestEnable = VK_FALSE;
-
+	info.front = {};
+	info.back = {};
 	return info;
 }
 
@@ -296,4 +325,22 @@ VkImageSubresourceRange vkinit::image_subresource_range(VkImageAspectFlags aspec
     subImage.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
     return subImage;
+}
+
+VkViewport vkinit::viewport_create_info(VkExtent2D extent) {
+	VkViewport info = {};
+	info.x = 0.0f;
+	info.y = 0.0f;
+	info.width = (float)extent.width;
+	info.height = (float)extent.height;
+	info.minDepth = 0.0f;
+	info.maxDepth = 1.0f;
+	return info;
+}
+
+VkRect2D vkinit::scissor_create_info(VkExtent2D extent) {
+	VkRect2D info = {};
+	info.offset = { 0, 0 };
+	info.extent = extent;
+	return info;
 }
