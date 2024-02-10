@@ -34,11 +34,11 @@ void Camera::initialize(void)
     _isFirst = true;
     _isOn = false;
     _clickOn = false;
-    _cameraPos = glm::vec3(0, 0 ,-2.0);
-    _cameraUp = glm::vec3(0,1,0);
-    _cameraFront = glm::vec3(0,0,1);
+    _cameraPos = glm::vec3(0, 0 ,2.0);
+    _cameraUp = glm::vec3(0,-1,0);
+    _cameraFront = glm::vec3(0,0,-1.);
     _worldUp = _cameraUp;
-    _zFar = 50;
+    _zFar = 500;
     _moveDir = CAMERA_MOVE_DIR::MOVE_STOP;
     projection = glm::perspective(glm::radians(_fov), 1920.f / 1080.f, _zNear, _zFar);
     updateCameraVectors(); 

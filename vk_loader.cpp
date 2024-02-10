@@ -243,7 +243,7 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter)
     }
 }
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string dirPath, std::string fileName)
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string dirPath, std::string fileName, MaterialPass passType)
 {
     const std::string filePath = dirPath + fileName;
     std::cout << "Loading GLTF: "<<  filePath << std::endl;
@@ -353,7 +353,6 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
             // if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
             //     passType = MaterialPass::Transparent;
             // }
-            MaterialPass passType = MaterialPass::SkyBox;
             GLTFMetallic_Roughness::MaterialResources materialResources;
             // default the material textures
             // materialResources.colorImage = engine->_errorCheckerboardImage;
@@ -400,8 +399,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
         constants.colorFactors = glm::vec4(1.0f);
         constants.metal_rough_factors = glm::vec4(0.0f);
         sceneMaterialConstants[0] = constants;
-
-        MaterialPass passType = MaterialPass::SkyBox;
+        std::cerr << "empty" << std::endl;
         GLTFMetallic_Roughness::MaterialResources materialResources;
         // default the material textures
         materialResources.colorImage = engine->_skyBoxImage;
@@ -589,6 +587,10 @@ void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName
     assert(result == KTX_SUCCESS);
 
     engine->_skyBoxImage = engine->createCubeImage(ktxTexture, format);
+    engine->_mainDeletionQueue.push_function([=]() {
+        engine->destroy_image(engine->_skyBoxImage);
+    });
+    ktxTexture_Destroy(ktxTexture);
 }   
 
 void LoadedGLTF::clearAll()

@@ -29,7 +29,7 @@ layout( push_constant ) uniform constants
 
 void main() 
 {
-  gl_Position = sceneData.proj * PushConstants.render_matrix * vec4(inPos.xyz, 1.0);
+  gl_Position = sceneData.viewproj * PushConstants.render_matrix * vec4(inPos.xyz, 1.0);
 
 	outPos = vec3(PushConstants.render_matrix * vec4(inPos, 1.0));
 	outNormal = mat3(PushConstants.render_matrix) * inNormal;

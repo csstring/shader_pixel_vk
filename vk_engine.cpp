@@ -46,7 +46,7 @@ void VulkanEngine::init()
 	init_descriptors();
   init_pipelines();
 	load_meshes();
-	loadCubeMap(this, "./assets/textures/", "cubemap_yokohama_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM);
+	loadCubeMap(this, "./assets/textures/", "cubemap_vulkan.ktx", VK_FORMAT_R8G8B8A8_UNORM);
 	init_imgui();
 	_isInitialized = true;
 	// cloudScene = new CloudScene();
@@ -57,12 +57,13 @@ void VulkanEngine::init()
   // assert(FlightHelmetFile.has_value());
   // loadedScenes["FlightHelmet"] = *FlightHelmetFile;
 
-	auto cubeFile = loadGltf(this,"./assets/models/", "cube.gltf");
-	// auto sphere = loadGltf(this,"./assets/models/", "sphere.gltf");
-	assert(cubeFile.has_value());
-	// assert(sphere.has_value());
-	loadedScenes["cubeFile"] = *cubeFile;
-	// loadedScenes["sphere"] = *sphere;
+	auto skyBox = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::SkyBox);
+	auto sphere = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::Reflect);
+	assert(skyBox.has_value());
+	assert(sphere.has_value());
+	loadedScenes["skyBox"] = *skyBox;
+	// loadedScenes["sphereOut"] = *sphere;
+	loadedScenes["sphereIn"] = *sphere;
 }
 
 void VulkanEngine::init_vulkan()
@@ -1074,6 +1075,9 @@ AllocatedImage VulkanEngine::createCubeImage(ktxTexture* ktxTexture, VkFormat fo
 	sampler.maxAnisotropy = 1.0f;
 
 	VK_CHECK(vkCreateSampler(_device, &sampler, nullptr, &_skyBoxSamplerLinear));
+	_mainDeletionQueue.push_function([=]() {
+		vkDestroySampler(_device, _skyBoxSamplerLinear, nullptr);
+  });
 
 	return newImage;
 }
@@ -1086,11 +1090,15 @@ void VulkanEngine::destroy_buffer(const AllocatedBuffer& buffer)
 void VulkanEngine::update_scene()
 {
 	mainDrawContext.OpaqueSurfaces.clear();
-
-	loadedScenes["cubeFile"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(200.0f));
+	glm::mat4 s1 = glm::scale(glm::mat4(1.0f), glm::vec3(5.0f));
+	loadedScenes["skyBox"]->Draw(s, mainDrawContext);
+	// loadedScenes["sphereOut"]->Draw(s, mainDrawContext);
+	loadedScenes["sphereIn"]->Draw(s1, mainDrawContext);
 	Camera& _camera = Camera::getInstance();
 
 	sceneData.view = _camera._view;
+	// sceneData.view = glm::lookAt(glm::vec3(0.0f), _camera._cameraFront, _camera._cameraUp);
 	sceneData.proj = _camera.getProjection();
 	sceneData.proj[1][1] *= -1;
 	sceneData.viewproj = sceneData.proj * sceneData.view;
@@ -1100,16 +1108,6 @@ void VulkanEngine::update_scene()
 
 void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 {
-	VkShaderModule meshVertexShader;
-	VkShaderModule meshFragShader;
-
-	if (!vkutil::load_shader_module("./spv/mesh.vert.spv", engine->_device, &meshVertexShader)) {
-		std::cerr << "Error when building the mesh vertex shader module" << std::endl;
-	}
-	if (!vkutil::load_shader_module("./spv/mesh.frag.spv", engine->_device, &meshFragShader)) {
-		std::cerr << "Error when building the mesh frag shader module" << std::endl;
-	}
-
 	VkPushConstantRange matrixRange{};
 	matrixRange.offset = 0;
 	matrixRange.size = sizeof(GPUDrawPushConstants);
@@ -1138,45 +1136,27 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
   opaquePipeline.layout = newLayout;
   transparentPipeline.layout = newLayout;
 
-	// build the stage-create-info for both vertex and fragment stages. This lets
-	// the pipeline know the shader modules per stage
+	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 	PipelineBuilder pipelineBuilder;
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, meshVertexShader));
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, meshFragShader));
-	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info();
-	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	pipelineBuilder.loadShader("./spv/mesh.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
+	pipelineBuilder.loadShader("./spv/mesh.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info(vertexDescription);
+	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
 	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
 	pipelineBuilder._scissor= vkinit::scissor_create_info(engine->_windowExtent);
-	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
-	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info();
-	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state();
-
-	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
-	pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions = vertexDescription.attributes.data();
-	pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = vertexDescription.attributes.size();
-	pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
-	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
-
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
+	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(0xf, VK_FALSE);
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
-	//render format
-
-	// use the triangle layout we created
 	pipelineBuilder._pipelineLayout = newLayout;
 
-	// finally build the pipeline
   opaquePipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 
-	// create the transparent variant
 	pipelineBuilder._colorBlendAttachment = vkinit::enable_blending_additive();
-
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, false, VK_COMPARE_OP_LESS_OR_EQUAL);
 	transparentPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 	
-	vkDestroyShaderModule(engine->_device, meshFragShader, nullptr);
-	vkDestroyShaderModule(engine->_device, meshVertexShader, nullptr);
-
+	pipelineBuilder.shaderFlush(engine->_device);
 	engine->_mainDeletionQueue.push_function([=]() {
 		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
 		vkDestroyPipeline(engine->_device, opaquePipeline.pipeline, nullptr);
@@ -1195,6 +1175,8 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VkDevice device, Materia
 		matData.pipeline = &opaquePipeline;
 	} else if (pass == MaterialPass::SkyBox) {
 		matData.pipeline = &skyBoxPipeline;
+	} else if (pass == MaterialPass::Reflect) {
+		matData.pipeline = &reflectPipeline;
 	} else {
 		std::cerr << "pipe line pass fail" << std::endl;
 	}
@@ -1240,35 +1222,10 @@ void VulkanEngine::destroy_image(const AllocatedImage& img)
 
 void GLTFMetallic_Roughness::buildSkyBoxpipelines(VulkanEngine* engine)
 {
-	VkShaderModule skyboxVertexShader;
-	VkShaderModule skyboxFragShader;
-	VkShaderModule reflectVertexShader;
-	VkShaderModule reflectFragShader;
-
-	if (!vkutil::load_shader_module("./spv/skybox.vert.spv", engine->_device, &skyboxVertexShader)) {
-		std::cerr << "Error when building the skybox vertex shader module" << std::endl;
-	}
-	if (!vkutil::load_shader_module("./spv/skybox.frag.spv", engine->_device, &skyboxFragShader)) {
-		std::cerr << "Error when building the skybox frag shader module" << std::endl;
-	}
-	if (!vkutil::load_shader_module("./spv/reflect.vert.spv", engine->_device, &reflectVertexShader)) {
-		std::cerr << "Error when building the reflect vertex shader module" << std::endl;
-	}
-	if (!vkutil::load_shader_module("./spv/reflect.frag.spv", engine->_device, &reflectFragShader)) {
-		std::cerr << "Error when building the reflect frag shader module" << std::endl;
-	}
-
 	VkPushConstantRange matrixRange{};
 	matrixRange.offset = 0;
 	matrixRange.size = sizeof(GPUDrawPushConstants);
 	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-  DescriptorLayoutBuilder layoutBuilder;
-  layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-	layoutBuilder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-
-  materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	VkDescriptorSetLayout layouts[] = { 
 			engine->_gpuSceneDataDescriptorLayout,
@@ -1285,46 +1242,29 @@ void GLTFMetallic_Roughness::buildSkyBoxpipelines(VulkanEngine* engine)
 
   skyBoxPipeline.layout = newLayout;
   reflectPipeline.layout = newLayout;
-
-	// build the stage-create-info for both vertex and fragment stages. This lets
-	// the pipeline know the shader modules per stage
-	PipelineBuilder pipelineBuilder;
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, skyboxVertexShader));
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, skyboxFragShader));
-	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info();
-	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
-	pipelineBuilder._scissor= vkinit::scissor_create_info(engine->_windowExtent);
-	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
-	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info();
-	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state();
-
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
-	pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions = vertexDescription.attributes.data();
-	pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = vertexDescription.attributes.size();
-	pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
-	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
-
+	PipelineBuilder pipelineBuilder;
+	pipelineBuilder.loadShader("./spv/skybox.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
+	pipelineBuilder.loadShader("./spv/skybox.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info(vertexDescription);
+	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
+	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
+	pipelineBuilder._scissor = vkinit::scissor_create_info(engine->_windowExtent);
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
+	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(0xf, VK_FALSE);
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(false, false, VK_COMPARE_OP_LESS_OR_EQUAL);
-
 	pipelineBuilder._pipelineLayout = newLayout;
   skyBoxPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
-	pipelineBuilder._shaderStages.clear();
-	// create the transparent variant
+	pipelineBuilder.shaderFlush(engine->_device);
 
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, reflectVertexShader));
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, reflectFragShader));
+	pipelineBuilder.loadShader("./spv/reflect.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
+	pipelineBuilder.loadShader("./spv/reflect.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+	pipelineBuilder._rasterizer.cullMode=VK_CULL_MODE_BACK_BIT;
 	reflectPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
-	
-	vkDestroyShaderModule(engine->_device, skyboxFragShader, nullptr);
-	vkDestroyShaderModule(engine->_device, skyboxVertexShader, nullptr);
-	vkDestroyShaderModule(engine->_device, reflectFragShader, nullptr);
-	vkDestroyShaderModule(engine->_device, reflectVertexShader, nullptr);
+	pipelineBuilder.shaderFlush(engine->_device);
+
 	engine->_mainDeletionQueue.push_function([=]() {
 		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
 		vkDestroyPipeline(engine->_device, skyBoxPipeline.pipeline, nullptr);
