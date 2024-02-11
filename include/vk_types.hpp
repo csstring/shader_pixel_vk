@@ -77,10 +77,15 @@ struct Material {
 enum class MaterialPass :uint8_t {
     MainColor,
     Transparent,
-    SkyBox,
+    World1_InSkyBox,
+    World1_outSkyBox,
+    World2_InSkyBox,
+    World2_outSkyBox,
     Reflect,
+    StencilFill,
     Other
 };
+
 struct MaterialPipeline {
 	VkPipeline pipeline;
 	VkPipelineLayout layout;
@@ -106,9 +111,6 @@ struct RenderObject {
 
 
 struct GPUSceneData {
-    glm::mat4 view;
-    glm::mat4 proj;
-    glm::mat4 viewproj;
     glm::vec4 ambientColor;
     glm::vec4 sunlightDirection; // w for sun power
     glm::vec4 sunlightColor;
@@ -158,7 +160,9 @@ struct alignas(16) DefualtPushConstants {
 };
 
 struct GPUDrawPushConstants {
-    glm::mat4 worldMatrix;
+  glm::mat4 worldMatrix;
+  glm::mat4 view;
+  glm::mat4 proj;
 };
 
 class VulkanEngine;

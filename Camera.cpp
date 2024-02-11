@@ -112,3 +112,14 @@ glm::vec4 Camera::getWorldCursorPos(float width, float height) const
 
     return glm::vec4(_cameraPos + _cameraFront * distance + _cameraRight * x + _cameraUp * y, 1.0f);
 }
+
+glm::mat4 Camera::getMirrorView(glm::vec3 mirrorNormal,glm::vec3 mirrorPoint)
+{
+    glm::vec3 toMirror = _cameraPos - mirrorPoint;
+    glm::vec3 reflectedVector = glm::reflect(toMirror, mirrorNormal);
+    glm::vec3 reflectedPosition = mirrorPoint + reflectedVector;
+    glm::vec3 reflectedFront = glm::reflect(_cameraFront, mirrorNormal);    
+    glm::vec3 reflectedTarget = reflectedPosition + reflectedFront;
+    glm::mat4 reflectedView = glm::lookAt(reflectedPosition, reflectedTarget, _cameraUp);
+    return reflectedView;
+}

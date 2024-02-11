@@ -19,6 +19,8 @@ layout (location = 4) out vec3 outLightVec;
 layout( push_constant ) uniform constants
 {
 	mat4 render_matrix;
+	mat4 view;
+	mat4 proj;
 } PushConstants;
 
 void main() 
@@ -26,12 +28,12 @@ void main()
 	outNormal = inNormal;
 	outColor = inColor;
 	outUV = inUV;
-	gl_Position =  sceneData.viewproj * PushConstants.render_matrix * vec4(inPos, 1.0f);
+	gl_Position =  PushConstants.proj * PushConstants.view * PushConstants.render_matrix * vec4(inPos, 1.0f);
 
-	vec4 pos = sceneData.view * vec4(inPos, 1.0);
+	vec4 pos = PushConstants.view * vec4(inPos, 1.0);
 
-	outNormal = mat3(sceneData.view) * inNormal;
-	vec3 lPos = mat3(sceneData.view) * sceneData.sunlightDirection.xyz;
+	outNormal = mat3(PushConstants.view) * inNormal;
+	vec3 lPos = mat3(PushConstants.view) * sceneData.sunlightDirection.xyz;
 	outLightVec = sceneData.sunlightDirection.xyz - pos.xyz;
 	outViewVec = sceneData.viewPos.xyz - pos.xyz;	
 

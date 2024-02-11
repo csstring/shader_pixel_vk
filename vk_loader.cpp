@@ -359,11 +359,14 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
             // materialResources.colorSampler = engine->_defaultSamplerLinear;
             // materialResources.metalRoughImage = engine->_errorCheckerboardImage;
             // materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
-            materialResources.colorImage = engine->_skyBoxImage;
-            materialResources.colorSampler = engine->_skyBoxSamplerLinear;
-            materialResources.metalRoughImage = engine->_skyBoxImage;
-            materialResources.metalRoughSampler = engine->_skyBoxSamplerLinear;
-            // set the uniform buffer for the material data
+            materialResources.colorImage = engine->_errorCheckerboardImage;
+            materialResources.colorSampler = engine->_defaultSamplerLinear;
+            // if (passType != MaterialPass::SkyBoxVulkan){
+            //     materialResources.colorImage = engine->_spaceBoxImage;
+            //     materialResources.colorSampler = engine->_spaceBoxSamplerLinear;
+            // }
+            materialResources.metalRoughImage = engine->_vulkanBoxImage;
+            materialResources.metalRoughSampler = engine->_vulkanBoxSamplerLinear;
             materialResources.dataBuffer = file.materialDataBuffer.buffer;
             materialResources.dataBufferOffset = data_index * sizeof(GLTFMetallic_Roughness::MaterialConstants);
             // grab textures from gltf file
@@ -381,7 +384,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
                 }
             }
             std::cerr <<"load_imwrite_materialage" << std::endl;
-            newMat->data = engine->metalRoughMaterial.write_material(engine->_device, passType, materialResources, file.descriptorPool);
+            newMat->data = engine->metalRoughMaterial.write_material(engine, passType, materialResources, file.descriptorPool);
 
             data_index++;
         }
@@ -402,15 +405,19 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
         std::cerr << "empty" << std::endl;
         GLTFMetallic_Roughness::MaterialResources materialResources;
         // default the material textures
-        materialResources.colorImage = engine->_skyBoxImage;
-        materialResources.colorSampler = engine->_skyBoxSamplerLinear;
-        materialResources.metalRoughImage = engine->_skyBoxImage;
-        materialResources.metalRoughSampler = engine->_skyBoxSamplerLinear;
+        materialResources.colorImage = engine->_errorCheckerboardImage;
+        materialResources.colorSampler = engine->_defaultSamplerLinear;
+        // if (passType != MaterialPass::SkyBoxVulkan){
+        //         materialResources.colorImage = engine->_spaceBoxImage;
+        //         materialResources.colorSampler = engine->_spaceBoxSamplerLinear;
+        // }
+        materialResources.metalRoughImage = engine->_vulkanBoxImage;
+        materialResources.metalRoughSampler = engine->_vulkanBoxSamplerLinear;
 
         // set the uniform buffer for the material data
         materialResources.dataBuffer = file.materialDataBuffer.buffer;
         materialResources.dataBufferOffset = 0;
-        newMat->data = engine->metalRoughMaterial.write_material(engine->_device, passType, materialResources, file.descriptorPool);
+        newMat->data = engine->metalRoughMaterial.write_material(engine, passType, materialResources, file.descriptorPool);
     }
     vmaFlushAllocation(engine->_allocator, file.materialDataBuffer.allocation, 0, VK_WHOLE_SIZE);
     std::vector<uint32_t> indices;
@@ -573,7 +580,7 @@ void LoadedGLTF::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
     }
 }
 
-void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format)
+void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format, VkSampler* sampler, AllocatedImage* newImage)
 {
     ktxResult result;
     ktxTexture* ktxTexture;
@@ -586,9 +593,9 @@ void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName
     result = ktxTexture_CreateFromNamedFile(filePath.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
     assert(result == KTX_SUCCESS);
 
-    engine->_skyBoxImage = engine->createCubeImage(ktxTexture, format);
+    *newImage = engine->createCubeImage(ktxTexture, format, sampler);
     engine->_mainDeletionQueue.push_function([=]() {
-        engine->destroy_image(engine->_skyBoxImage);
+        engine->destroy_image(*newImage);
     });
     ktxTexture_Destroy(ktxTexture);
 }   

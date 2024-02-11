@@ -14,9 +14,12 @@ class CloudScene;
 struct GLTFMetallic_Roughness {
 	MaterialPipeline opaquePipeline;
 	MaterialPipeline transparentPipeline;
-  MaterialPipeline skyBoxPipeline;
-  MaterialPipeline reflectPipeline;
+  MaterialPipeline world_INskyBoxPipeline;
+  MaterialPipeline world_OutSkyBoxPipeline;
 
+  MaterialPipeline reflectPipeline;
+  MaterialPipeline stencilFillPipeline;
+  
 	VkDescriptorSetLayout materialLayout;
 
 	struct MaterialConstants {
@@ -36,11 +39,12 @@ struct GLTFMetallic_Roughness {
 	};
 
 	void build_pipelines(VulkanEngine* engine);
-  void buildSkyBoxpipelines(VulkanEngine* engine);
+  void buildWorldSkyBoxpipelines(VulkanEngine* engine);
+  void buildstencilFillpipelines(VulkanEngine* engine);
   // void buildReflectpipelines(VulkanEngine* engine);
   
   DescriptorWriter writer;
-	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+	MaterialInstance write_material(VulkanEngine* engine, MaterialPass pass, MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 };
 
 struct MeshNode : public Node {
@@ -102,7 +106,7 @@ class VulkanEngine
     Material* get_material(const std::string& name);
     AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
-    AllocatedImage createCubeImage(ktxTexture* ktxTexture, VkFormat format);
+    AllocatedImage createCubeImage(ktxTexture* ktxTexture, VkFormat format, VkSampler* sampler);
     Mesh* get_mesh(const std::string& name);
     size_t pad_uniform_buffer_size(size_t originalSize);
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
@@ -161,10 +165,13 @@ class VulkanEngine
     AllocatedImage _blackImage;
     AllocatedImage _greyImage;
     AllocatedImage _errorCheckerboardImage;
-    AllocatedImage _skyBoxImage;
+    AllocatedImage _vulkanBoxImage;
+    AllocatedImage _spaceBoxImage;
+
     VkSampler _defaultSamplerLinear;
 	  VkSampler _defaultSamplerNearest;
-    VkSampler _skyBoxSamplerLinear;
+    VkSampler _vulkanBoxSamplerLinear;
+    VkSampler _spaceBoxSamplerLinear;
 
     DrawContext mainDrawContext;
     std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
