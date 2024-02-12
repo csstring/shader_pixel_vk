@@ -50,10 +50,10 @@ void VulkanEngine::init()
 	loadCubeMap(this, "./assets/textures/", "cubemap_space.ktx", VK_FORMAT_R8G8B8A8_UNORM, &_spaceBoxSamplerLinear, &_spaceBoxImage);
 	init_imgui();
 	_isInitialized = true;
-	// cloudScene = new CloudScene();
-	// cloudScene->initialize(this);
+	_cloud = new CloudScene();
+	_cloud->initialize(this);
   init_scene();
-
+	_portalManager.initialize(glm::scale(glm::mat4(1.0f), glm::vec3(20.0f)), glm::mat4(1.0f), PortalState::In_World1);
   // auto FlightHelmetFile = loadGltf(this,"./assets/models/FlightHelmet/glTF/", "FlightHelmet.gltf");
   // assert(FlightHelmetFile.has_value());
   // loadedScenes["FlightHelmet"] = *FlightHelmetFile;
@@ -63,7 +63,7 @@ void VulkanEngine::init()
 	auto World1_outSkyBox = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::World1_outSkyBox);
 	auto World2_InSkyBox = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::World2_InSkyBox);
 	auto World2_outSkyBox = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::World2_outSkyBox);
-
+	auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
 	auto plane = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::StencilFill);
 	auto plane_z = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill);
 	auto plane_circle = loadGltf(this,"./assets/models/", "plane_circle.gltf", MaterialPass::StencilFill);
@@ -76,6 +76,7 @@ void VulkanEngine::init()
 	assert(plane.has_value());
 	assert(plane_z.has_value());
 	assert(plane_circle.has_value());
+	assert(cloudCube.has_value());
 
 	loadedScenes["World1_InSkyBox"] = *World1_InSkyBox;
 	loadedScenes["World1_outSkyBox"] = *World1_outSkyBox;
@@ -85,7 +86,7 @@ void VulkanEngine::init()
 	loadedScenes["plane"] = *plane;
 	loadedScenes["plane_z"] = *plane_z;
 	loadedScenes["plane_circle"] = *plane_circle;
-
+	loadedScenes["cloudCube"] = *cloudCube;
 }
 
 void VulkanEngine::init_vulkan()
@@ -405,6 +406,7 @@ void VulkanEngine::init_pipelines()
 	metalRoughMaterial.build_pipelines(this);
 	metalRoughMaterial.buildWorldSkyBoxpipelines(this);
 	metalRoughMaterial.buildstencilFillpipelines(this);
+	metalRoughMaterial.build_cloudPipelines(this);
 }
 
 //------------------run-------------
@@ -417,6 +419,7 @@ void VulkanEngine::run()
 	while (!bQuit)
 	{
 		vkutil::SDL_event_process(&e, camera, bQuit);
+		update_scene();
 		camera.update();
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplSDL2_NewFrame(_window);
@@ -429,6 +432,7 @@ void VulkanEngine::run()
 		ImGui::SliderFloat3("light pos", &sceneData.sunlightDirection.x, -40, 40);
 		// ImGui::SliderFloat3("light pos", &sceneData.sunlightDirection.x, -40, 40);
 		ImGui::End();
+		_cloud->guiRender();
 		draw();
 	}
 }
@@ -436,7 +440,6 @@ void VulkanEngine::run()
 
 void VulkanEngine::draw()
 {
-	update_scene();
 	VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
 	VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
 
@@ -481,6 +484,7 @@ void VulkanEngine::draw()
 	//connect clear values
 	rpInfo.clearValueCount = 2;
 	rpInfo.pClearValues = clearValues;
+	_cloud->update(1.f/ 120.f);
 	// cloudScene->update(1./120., _frameNumber % 2);
 	ImGui::Render();
 	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -535,7 +539,7 @@ void VulkanEngine::cleanup()
 	if (_isInitialized) {
 		vkDeviceWaitIdle(_device);
     loadedScenes.clear();
-
+		delete _cloud;
 		for (int i =0; i < FRAME_OVERLAP; ++i){
     	vkWaitForFences(_device, 1, &_frames[i]._renderFence, true, 1000000000);
 			_frames[i]._deletionQueue.flush();
@@ -771,6 +775,11 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject* first, int co
 	vmaFlushAllocation(_allocator, gpuSceneDataBuffer.allocation, 0, VK_WHOLE_SIZE);
 	vmaUnmapMemory(_allocator, gpuSceneDataBuffer.allocation);
 
+	GPUDrawPushConstants pushConstants;
+	pushConstants.view = _camera._view;
+	pushConstants.proj = _camera.getProjection();
+	pushConstants.proj[1][1] *= -1;
+	
 	for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces)
 	{
 		VkDeviceSize offset = 0;
@@ -779,13 +788,17 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject* first, int co
 		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 1,1, &draw.material->materialSet,0,nullptr );
 		vkCmdBindIndexBuffer(cmd, draw.indexBuffer,0,VK_INDEX_TYPE_UINT32);
 		vkCmdBindVertexBuffers(cmd, 0, 1, &draw.vertexBuffer, &offset);
-		
-		GPUDrawPushConstants pushConstants;
-		pushConstants.worldMatrix = draw.transform;
-		pushConstants.view = _camera._view;
-		pushConstants.proj = _camera.getProjection();
-		pushConstants.proj[1][1] *= -1;
-		vkCmdPushConstants(cmd, draw.material->pipeline->layout ,VK_SHADER_STAGE_VERTEX_BIT,0, sizeof(GPUDrawPushConstants), &pushConstants);
+		if (draw.material->passType == MaterialPass::Cloud){
+			_cloud->constants.view = _camera._view;
+			_cloud->constants.proj = _camera.getProjection();
+			_cloud->constants.proj[1][1] *= -1;
+			_cloud->constants.worldMatrix = draw.transform;
+			vkCmdPushConstants(cmd, draw.material->pipeline->layout ,VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0, sizeof(CloudPushConstants), &_cloud->constants);
+		}	
+		else {
+			pushConstants.worldMatrix = draw.transform;
+			vkCmdPushConstants(cmd, draw.material->pipeline->layout ,VK_SHADER_STAGE_VERTEX_BIT,0, sizeof(GPUDrawPushConstants), &pushConstants);
+		}
 		vkCmdDrawIndexed(cmd, draw.indexCount,1,draw.firstIndex,0,0);
 	}
 	//mirror
@@ -1135,24 +1148,30 @@ void VulkanEngine::destroy_buffer(const AllocatedBuffer& buffer)
 void VulkanEngine::update_scene()
 {
 	Camera& _camera = Camera::getInstance();
+	_portalManager.update();
 	mainDrawContext.OpaqueSurfaces.clear();
 	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(200.0f));
-	glm::mat4 s1 = glm::scale(glm::mat4(1.0f), glm::vec3(20.0f)) * glm::translate(glm::vec3(0,0,0));
-	glm::mat4 s2 = glm::scale(glm::mat4(1.0f), glm::vec3(20.0f)) * glm::translate(glm::vec3(0,0, 10));
-	// loadedScenes["sphereIn"]->Draw(s1, mainDrawContext);
-	// loadedScenes["plane"]->Draw(s1, mainDrawContext);
-	loadedScenes["plane_z"]->Draw(s1, mainDrawContext);
 
-	if (_camera._cameraPos.z > 0){
-		loadedScenes["World1_InSkyBox"]->Draw(s, mainDrawContext);
-		loadedScenes["World2_outSkyBox"]->Draw(s, mainDrawContext);
-	} else {
-		loadedScenes["World2_InSkyBox"]->Draw(s, mainDrawContext);
-		loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
-	}
-
-	sceneData.viewPos = _camera._view * glm::vec4(_camera._cameraPos, 1.0f);
-	// defualtConstants.camPos = glm::vec4(_camera._cameraPos,1.0f);
+	// loadedScenes["plane_z"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
+	loadedScenes["cloudCube"]->Draw(_cloud->getModelMatrix(), mainDrawContext);
+	// switch (_portalManager.getPortalState())
+	// {
+	// case PortalState::In_World1:
+		// loadedScenes["World2_InSkyBox"]->Draw(s, mainDrawContext);
+	loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
+	// 	// std::cout << "In_World1 " << std::endl;
+	// 	break;
+	// case PortalState::In_World2:
+	// 	loadedScenes["World1_InSkyBox"]->Draw(s, mainDrawContext);
+	// 	loadedScenes["World2_outSkyBox"]->Draw(s, mainDrawContext);
+	// 	// std::cout << "In_World2 " << std::endl;
+	// 	break;
+	// default:
+	// 	std::cerr << "world error" << std::endl;
+	// 	break;
+	// }
+	// sceneData.viewPos = _camera._view * glm::vec4(_camera._cameraPos, 1.0f);
+	sceneData.viewPos = glm::vec4(_camera._cameraPos,1);
 }
 
 void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
@@ -1166,6 +1185,7 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
   layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	layoutBuilder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	layoutBuilder.add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
   materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
@@ -1217,33 +1237,59 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VulkanEngine* engine, Ma
 {
 	MaterialInstance matData;
 	matData.passType = pass;
-	if (pass == MaterialPass::Transparent) {
+	switch (pass)
+	{
+	case MaterialPass::Transparent:
 		matData.pipeline = &transparentPipeline;
-	}
-	else if (pass == MaterialPass::MainColor) {
+		break;
+	case MaterialPass::MainColor:
 		matData.pipeline = &opaquePipeline;
-	} else if (pass == MaterialPass::Reflect) {
+		break;
+	case MaterialPass::Reflect:
 		matData.pipeline = &reflectPipeline;
-	} else if (pass == MaterialPass::StencilFill) {
+		break;
+	case MaterialPass::StencilFill:
 		matData.pipeline = &stencilFillPipeline;
-	} else if (pass == MaterialPass::World1_InSkyBox) {
+		break;
+	case MaterialPass::World1_InSkyBox:
 		matData.pipeline = &world_INskyBoxPipeline;
-		resources.colorImage = engine->_vulkanBoxImage;
-    resources.colorSampler = engine->_vulkanBoxSamplerLinear;
-	} else if (pass == MaterialPass::World1_outSkyBox) {
+		resources.skyBoxImage = engine->_vulkanBoxImage;
+    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
+		break;
+	case MaterialPass::World1_outSkyBox:
 		matData.pipeline = &world_OutSkyBoxPipeline;
-		resources.colorImage = engine->_vulkanBoxImage;
-    resources.colorSampler = engine->_vulkanBoxSamplerLinear;
-	} else if (pass == MaterialPass::World2_InSkyBox) {
+		resources.skyBoxImage = engine->_vulkanBoxImage;
+    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
+		break;
+	case MaterialPass::World2_InSkyBox:
 		matData.pipeline = &world_INskyBoxPipeline;
-		resources.colorImage = engine->_spaceBoxImage;
-    resources.colorSampler = engine->_spaceBoxSamplerLinear;
-	} else if (pass == MaterialPass::World2_outSkyBox) {
+		resources.skyBoxImage = engine->_spaceBoxImage;
+    resources.skyBoxSampler = engine->_spaceBoxSamplerLinear;
+		break;
+	case MaterialPass::World2_outSkyBox:
 		matData.pipeline = &world_OutSkyBoxPipeline;
-		resources.colorImage = engine->_spaceBoxImage;
-    resources.colorSampler = engine->_spaceBoxSamplerLinear;
-	} else {
-		std::cerr << "pipe line pass fail" << std::endl;
+		resources.skyBoxImage = engine->_spaceBoxImage;
+    resources.skyBoxSampler = engine->_spaceBoxSamplerLinear;
+		break;
+	case MaterialPass::Cloud:
+		matData.pipeline = &cloudPipeline;
+		resources.colorImage = engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY];
+    resources.colorSampler = engine->_defaultSamplerLinear;
+		resources.metalRoughImage = engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT];
+		resources.metalRoughSampler = engine->_defaultSamplerLinear;
+		resources.skyBoxImage = engine->_vulkanBoxImage;
+    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
+		matData.materialSet = descriptorAllocator.allocate(engine->_device, materialLayout);
+
+		writer.clear();
+		writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+		writer.write_image(1, resources.colorImage._imageView, resources.colorSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.write_image(2, resources.metalRoughImage._imageView, resources.metalRoughSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.write_image(3, resources.skyBoxImage._imageView, resources.skyBoxSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.update_set(engine->_device, matData.materialSet);
+		return matData;
+	default:
+		break;
 	}
 
 	matData.materialSet = descriptorAllocator.allocate(engine->_device, materialLayout);
@@ -1252,7 +1298,7 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VulkanEngine* engine, Ma
 	writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 	writer.write_image(1, resources.colorImage._imageView, resources.colorSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	writer.write_image(2, resources.metalRoughImage._imageView, resources.metalRoughSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-
+	writer.write_image(3, resources.skyBoxImage._imageView, resources.skyBoxSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	writer.update_set(engine->_device, matData.materialSet);
 
 	return matData;
@@ -1398,5 +1444,51 @@ void GLTFMetallic_Roughness::buildstencilFillpipelines(VulkanEngine* engine)
 	engine->_mainDeletionQueue.push_function([=]() {
 		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
 		vkDestroyPipeline(engine->_device, stencilFillPipeline.pipeline, nullptr);
+  });
+}
+
+void GLTFMetallic_Roughness::build_cloudPipelines(VulkanEngine* engine)
+{
+	VkPushConstantRange matrixRange{};
+	matrixRange.offset = 0;
+	matrixRange.size = sizeof(CloudPushConstants);
+	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayout layouts[] = { 
+			engine->_gpuSceneDataDescriptorLayout,
+      materialLayout };
+
+	VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
+	mesh_layout_info.setLayoutCount = 2;
+	mesh_layout_info.pSetLayouts = layouts;
+	mesh_layout_info.pPushConstantRanges = &matrixRange;
+	mesh_layout_info.pushConstantRangeCount = 1;
+
+	VkPipelineLayout newLayout;
+	VK_CHECK(vkCreatePipelineLayout(engine->_device, &mesh_layout_info, nullptr, &newLayout));
+
+  cloudPipeline.layout = newLayout;
+
+	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
+	PipelineBuilder pipelineBuilder;
+	pipelineBuilder.loadShader("./spv/cloud.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
+	pipelineBuilder.loadShader("./spv/cloud.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info(vertexDescription);
+	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
+	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
+	pipelineBuilder._scissor= vkinit::scissor_create_info(engine->_windowExtent);
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
+	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+		VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, false);
+	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+	pipelineBuilder._pipelineLayout = newLayout;
+
+  cloudPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
+	pipelineBuilder.shaderFlush(engine->_device);
+
+	engine->_mainDeletionQueue.push_function([=]() {
+		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
+		vkDestroyPipeline(engine->_device, cloudPipeline.pipeline, nullptr);
   });
 }

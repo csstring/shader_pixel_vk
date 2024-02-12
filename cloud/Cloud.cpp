@@ -4,7 +4,6 @@
 #include "vk_initializers.hpp"
 #include "Camera.hpp"
 #include "imgui.h"
-#include <glm/gtx/transform.hpp>
 //더블 이미지쓰지 말고 하나로 일단 해보자
 
 void CloudScene::guiRender()
@@ -16,9 +15,9 @@ void CloudScene::guiRender()
 	ImGui::SliderFloat3("lightDir", &constants.lightDir.x, -4, 4);
 	ImGui::SliderFloat3("lightColor", &constants.lightColor.x, 0, 255);
 	ImGui::SliderFloat3("uvwOffset", &constants.uvwOffset.x, 0, 100);
-	ImGui::SliderFloat3("model translate", &modelTrans.x, -50, 50);
+	ImGui::SliderFloat3("model translate", &modelTrans.x, -250, 250);
+	ImGui::SliderFloat3("model scale", &modelscale.x, 0, 50);
 	ImGui::End();
-	// _engine->_renderables.front().transformMatrix = glm::translate(modelTrans) *  glm::scale(glm::vec3{60,60,60});
 }
 
 void CloudScene::initialize(VulkanEngine* engine)
@@ -31,12 +30,11 @@ void CloudScene::initialize(VulkanEngine* engine)
 	constants.aniso = 0.3;
 	constants.uvwOffset = glm::vec4(1.0f,1.0f,1.0f, 0.0f);
 	constants.dt = 1.0f/120.0f;
-
+	modelTrans = glm::vec3(0,0,0);
+	modelscale = glm::vec3(1.0f);
   init_commands();
   init_sync_structures();
   init_image_buffer();
-  uploadCubeMesh();
-  initRenderPipelines();
   initGenCloudPipelines();
   initMakeLightTexturePipelines();
 }
@@ -192,7 +190,7 @@ void CloudScene::initGenCloudPipelines()
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = SetLayouts;
-  std::cerr << sizeof(CloudPushConstants) << std::endl;
+
 	VkPushConstantRange push_constant;
 	push_constant.offset = 0;
 	push_constant.size = sizeof(CloudPushConstants);
@@ -292,9 +290,6 @@ void CloudScene::initMakeLightTexturePipelines()
 
 void CloudScene::init_pipelines()
 {
-  initRenderPipelines();
-  initGenCloudPipelines();
-  initMakeLightTexturePipelines();
 }
 
 void CloudScene::uploadCubeMesh()
@@ -435,10 +430,8 @@ void CloudScene::genCloud()
   vkCmdDispatch(cmd, imageWidth/dispatchSize, imageHeight/dispatchSize, imageDepth / dispatchSize);
 }
 
-void CloudScene::update(float dt, uint32_t frameidx)
+void CloudScene::update(float dt)
 {
-	_curFrameIdx = frameidx;
-	guiRender();
 	Camera cam = Camera::getInstance();
 	static int color = 0;
 	static float beforeX = cam._lastX * imageWidth / _engine->_windowExtent.width;
@@ -449,14 +442,8 @@ void CloudScene::update(float dt, uint32_t frameidx)
 
 	beforeX = curX;
 	beforeY = curY;
-
-	constants.camPos = glm::vec4(cam._cameraPos,1.0f);
-	constants.cursorPos = glm::vec4(curX, curY, 0.f,0.f);
 	constants.uvwOffset += glm::vec4(constants.dt/4.0f, 0.,constants.dt/4.0f,0.);
-	if (cam._clickOn == true){
-		constants.cursorPos.w = 1.0f;
-	}
-
+	
 	makeLightTexture();
   genCloud();
 

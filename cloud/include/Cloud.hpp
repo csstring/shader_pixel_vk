@@ -1,13 +1,13 @@
 #pragma once
 
 #include "vk_engine.hpp"
-
+#include <glm/gtx/transform.hpp>
 enum CLOUDTEXTUREID {
   CLOUDDENSITY,
   CLOUDLIGHT
 };
 
-class CloudScene : public Scene
+class CloudScene
 {
   private:
     VulkanEngine* _engine;
@@ -15,8 +15,6 @@ class CloudScene : public Scene
     DeletionQueue _deletionQueue;
     ComputeContext _computeContext;
 
-    VkSampler _defaultSamplerLinear;
-    VkSampler _defualtSamplerNear;
 
 
     void makeLightTexture();
@@ -31,16 +29,19 @@ class CloudScene : public Scene
     uint32_t imageHeight = 128;
     uint32_t imageDepth = 128;
 
-    glm::vec3 modelTrans;
   public:
+    VkSampler _defaultSamplerLinear;
+    VkSampler _defualtSamplerNear;
+    glm::vec3 modelTrans;
+    glm::vec3 modelscale;
     uint32_t _curFrameIdx{0};
     AllocatedImage _cloudImageBuffer[2][2];
     CloudPushConstants constants;
     
     void initialize(VulkanEngine* engine);
-
+    glm::mat4 getModelMatrix(){return glm::scale(modelscale) * glm::translate(modelTrans);};
     void uploadCubeMesh();
-    void update(float dt, uint32_t frameidx);
+    void update(float dt);
     void draw(VkCommandBuffer cmd);
     void guiRender();
     void init_commands();

@@ -1,37 +1,39 @@
 #version 460
 
-struct ObjectData{
-	mat4 model;
-	vec4 color;
-};
 
-layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer {
-	ObjectData objects[];
-} objectBuffer;
-
-layout (location = 0) in vec3 vPosition;
-layout (location = 1) in vec3 vNormal;
-layout (location = 2) in vec3 uv;
-layout (location = 3) in vec2 vColor;
+layout (location = 0) in vec3 inPos;
+layout (location = 1) in vec3 inNormal;
+layout (location = 2) in vec2 inUV;
+layout (location = 3) in vec3 inColor;
 
 layout (location = 0) out vec3 modelPos;
 layout (location = 1) out mat4 worldInv;
 
 
-layout(set = 0, binding = 0) uniform  CameraBuffer{
-	mat4 view;
-	mat4 proj;
-	mat4 viewproj;
+layout(set = 0, binding = 0) uniform  SceneData{   
 	vec4 ambientColor;
-	vec4 sunlightDirection;
+	vec4 sunlightDirection; //w for sun power
 	vec4 sunlightColor;
 	vec4 viewPos;
-} cameraData;
+} sceneData;
 
+layout(push_constant) uniform Params {
+    mat4 render_matrix;
+    mat4 view;
+		mat4 proj;
+    vec4 uvwOffset;
+    vec4 lightDir;
+    vec4 lightColor;
+    float lightAbsorptionCoeff;
+    float densityAbsorption;
+    float aniso;
+    float dt;
+} PushConstants;
 
 void main()
 {
-	gl_Position = cameraData.viewproj * objectBuffer.objects[gl_BaseInstance].model *vec4(vPosition, 1.0f);
-	modelPos = vPosition;
-	worldInv = inverse(objectBuffer.objects[gl_BaseInstance].model);
+	gl_Position = PushConstants.proj * PushConstants.view * PushConstants.render_matrix * vec4(inPos, 1.0f);
+	// modelPos = (PushConstants.render_matrix * vec4(inPos, 1.0f)).xyz;
+  modelPos = inPos;
+	worldInv = inverse(PushConstants.render_matrix);
 }

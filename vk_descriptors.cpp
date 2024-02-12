@@ -194,7 +194,7 @@ VkDescriptorPool DescriptorAllocatorGrowable::get_pool(VkDevice device)
 	    //need to create a new pool
 	    newPool = create_pool(device, setsPerPool, ratios);
 
-	    setsPerPool = setsPerPool * 2;
+	    setsPerPool = setsPerPool * 4;
 	    if (setsPerPool > 4092) {
 		    setsPerPool = 4092;
 	    }

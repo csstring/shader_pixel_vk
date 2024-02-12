@@ -81,9 +81,17 @@ enum class MaterialPass :uint8_t {
     World1_outSkyBox,
     World2_InSkyBox,
     World2_outSkyBox,
+    Cloud,
     Reflect,
     StencilFill,
     Other
+};
+
+enum class PortalState :uint8_t {
+  Only_World1,
+  Only_World2,
+  In_World1,
+  In_World2
 };
 
 struct MaterialPipeline {
@@ -143,8 +151,9 @@ struct Texture {
 };
 
 struct alignas(16) CloudPushConstants {
-	glm::vec4 cursorPos;
-	glm::vec4 camPos;
+	glm::mat4 worldMatrix;
+  glm::mat4 view;
+  glm::mat4 proj;
 	glm::vec4 uvwOffset;
   glm::vec4 lightDir;
   glm::vec4 lightColor;

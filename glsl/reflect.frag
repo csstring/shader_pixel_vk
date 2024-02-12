@@ -1,7 +1,6 @@
 #version 450
 
-layout(set = 1, binding = 1) uniform samplerCube samplerCubeMap;
-layout(set = 1, binding = 2) uniform sampler2D metalRoughTex;
+layout(set = 1, binding = 3) uniform samplerCube skyBox;
 
 layout(set = 0, binding = 0) uniform  SceneData{   
 	vec4 ambientColor;
@@ -28,7 +27,7 @@ void main()
 	// Convert cubemap coordinates into Vulkan coordinate space
 	cR.xy *= -1.0;
 
-	vec4 color = texture(samplerCubeMap, cR, 0);
+	vec4 color = texture(skyBox, cR, 0);
 	// outFragColor= color;
 	vec3 N = normalize(inNormal);
 	vec3 L = normalize(inLightVec);

@@ -243,7 +243,7 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter)
     }
 }
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string dirPath, std::string fileName, MaterialPass passType)
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string dirPath, std::string fileName, MaterialPass passType, glm::mat4 transfrom)
 {
     const std::string filePath = dirPath + fileName;
     std::cout << "Loading GLTF: "<<  filePath << std::endl;
@@ -287,9 +287,9 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
     }
 
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = { 
-      { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 } };
+      { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,4 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,4 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4 } };
 
 
 
@@ -365,8 +365,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
             //     materialResources.colorImage = engine->_spaceBoxImage;
             //     materialResources.colorSampler = engine->_spaceBoxSamplerLinear;
             // }
-            materialResources.metalRoughImage = engine->_vulkanBoxImage;
-            materialResources.metalRoughSampler = engine->_vulkanBoxSamplerLinear;
+            materialResources.metalRoughImage = engine->_errorCheckerboardImage;
+            materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
             materialResources.dataBuffer = file.materialDataBuffer.buffer;
             materialResources.dataBufferOffset = data_index * sizeof(GLTFMetallic_Roughness::MaterialConstants);
             // grab textures from gltf file
@@ -411,8 +411,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
         //         materialResources.colorImage = engine->_spaceBoxImage;
         //         materialResources.colorSampler = engine->_spaceBoxSamplerLinear;
         // }
-        materialResources.metalRoughImage = engine->_vulkanBoxImage;
-        materialResources.metalRoughSampler = engine->_vulkanBoxSamplerLinear;
+        materialResources.metalRoughImage = engine->_errorCheckerboardImage;
+        materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
 
         // set the uniform buffer for the material data
         materialResources.dataBuffer = file.materialDataBuffer.buffer;
@@ -459,7 +459,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
                 fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, posAccessor,
                     [&](glm::vec3 v, size_t index) {
                         Vertex newvtx;
-                        newvtx.position = v;
+                        newvtx.position = transfrom * glm::vec4(v,1.f);
                         newvtx.normal = { 1, 0, 0 };
                         newvtx.color = glm::vec4 { 1.f };
                         newvtx.uv = {0,0};

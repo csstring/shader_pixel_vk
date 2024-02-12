@@ -7,6 +7,8 @@
 #include "vk_loader.hpp"  
 #include "ktx.h"
 #include "ktxvulkan.h"
+#include "Portal.hpp"
+#include "Cloud.hpp"
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 class CloudScene;
@@ -19,7 +21,7 @@ struct GLTFMetallic_Roughness {
 
   MaterialPipeline reflectPipeline;
   MaterialPipeline stencilFillPipeline;
-  
+  MaterialPipeline cloudPipeline;
 	VkDescriptorSetLayout materialLayout;
 
 	struct MaterialConstants {
@@ -34,6 +36,8 @@ struct GLTFMetallic_Roughness {
 		VkSampler colorSampler;
 		AllocatedImage metalRoughImage;
 		VkSampler metalRoughSampler;
+    AllocatedImage skyBoxImage;
+		VkSampler skyBoxSampler;
 		VkBuffer dataBuffer;
 		uint32_t dataBufferOffset;
 	};
@@ -41,6 +45,7 @@ struct GLTFMetallic_Roughness {
 	void build_pipelines(VulkanEngine* engine);
   void buildWorldSkyBoxpipelines(VulkanEngine* engine);
   void buildstencilFillpipelines(VulkanEngine* engine);
+  void build_cloudPipelines(VulkanEngine* engine);
   // void buildReflectpipelines(VulkanEngine* engine);
   
   DescriptorWriter writer;
@@ -176,4 +181,7 @@ class VulkanEngine
     DrawContext mainDrawContext;
     std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
     std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
+
+    Portal _portalManager;
+    CloudScene* _cloud;
 };

@@ -4,8 +4,9 @@ layout(set = 0, binding = 0) uniform sampler3D densityTex;
 layout(set = 0, binding = 1, rgba32f) uniform image3D lightingTex;
 
 layout(push_constant) uniform Params {
-    vec4 cursorPos;
-    vec4 camPos;
+    mat4 render_matrix;
+    mat4 view;
+	mat4 proj;
     vec4 uvwOffset;
     vec4 lightDir;
     vec4 lightColor;
@@ -13,7 +14,8 @@ layout(push_constant) uniform Params {
     float densityAbsorption;
     float aniso;
     float dt;
-} params;
+} PushConstants;
+
 
 float BeerLambert(float absorptionCoefficient, float distanceTraveled)
 {
@@ -37,7 +39,7 @@ float LightRay(vec3 posModel, vec3 lightDir)
         float density = texture(densityTex, GetUVW(posModel)).r;
 
         if (density > 1e-3)
-            alpha *= BeerLambert(params.lightAbsorptionCoeff * density, stepSize);
+            alpha *= BeerLambert(PushConstants.lightAbsorptionCoeff * density, stepSize);
 
         posModel += lightDir * stepSize;
 
@@ -57,6 +59,6 @@ void main() {
     ivec3 dtID = ivec3(gl_GlobalInvocationID.xyz);
     vec3 uvw = (vec3(dtID) + 0.5) / vec3(size);
     
-    float alpha = LightRay((uvw - 0.5) * 2.0, params.lightDir.xyz);
+    float alpha = LightRay((uvw - 0.5) * 2.0, PushConstants.lightDir.xyz);
     imageStore(lightingTex, dtID, vec4(alpha,0,0,0));
 }
