@@ -33,13 +33,13 @@ class CloudScene
     VkSampler _defaultSamplerLinear;
     VkSampler _defualtSamplerNear;
     glm::vec3 modelTrans;
-    glm::vec3 modelscale;
+    glm::vec3  modelscale;
     uint32_t _curFrameIdx{0};
     AllocatedImage _cloudImageBuffer[2][2];
     CloudPushConstants constants;
     
     void initialize(VulkanEngine* engine);
-    glm::mat4 getModelMatrix(){return glm::scale(modelscale) * glm::translate(modelTrans);};
+    glm::mat4 getModelMatrix(){return glm::translate(modelTrans) * glm::scale(modelscale);};
     void uploadCubeMesh();
     void update(float dt);
     void draw(VkCommandBuffer cmd);

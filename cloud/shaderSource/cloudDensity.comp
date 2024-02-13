@@ -154,5 +154,5 @@ void main()
   vec3 textureSize = imageSize(density);
   vec3 uvw = vec3(dtID) / textureSize + PushConstants.uvwOffset.xyz; // ������ ������ ���� uvwOffset ���
 
-  imageStore(density, dtID, vec4(cloudDensity(uvw),0.0f,0.0f,0.f));
+  imageStore(density, dtID, vec4(cloudDensity(uvw),0.0f,0.0f,0.0f));
 }

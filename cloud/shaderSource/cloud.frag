@@ -59,7 +59,7 @@ layout(location = 1) in mat4 worldInv;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-// vec3 eyeModel = (vec4(sceneData.viewPos)).xyz;
+
     vec3 eyeModel = (worldInv * vec4(sceneData.viewPos)).xyz;
     vec3 dirModel = normalize(inPosModel - eyeModel);
 
@@ -74,10 +74,13 @@ void main() {
     for (int i = 0; i < numSteps; ++i) {
         vec3 uvw = GetUVW(posModel);
         float density = texture(densityTex, uvw).r;
-        float lighting = 1.0; // Or sample lightingTex if needed이거 강의 봐봐야야함
-        // float sdf1 = sdEllipsoid(posModel, vec3(0.8, .2, .2));
-        // float sdf2 = sdTorus(posModel + vec3(0., 0.0,0.0), vec2(0.2, .7f));
+        float lighting = texture(lightingTex, uvw).r; // Or sample lightingTex if needed이거 강의 봐봐야야함
 
+        float sdf = sdSphere(posModel, 0.9);
+
+        if (sdf > 0.0f){
+            density *= clamp(1.0-sdf*10.0f, 0.0,1.0f);
+        }
         if (density > 1e-3) {
             float prevAlpha = color.a;
             color.a *= BeerLambert(PushConstants.densityAbsorption * density, stepSize);
@@ -90,7 +93,7 @@ void main() {
 
         posModel += dirModel * stepSize;
 
-        if (any(greaterThan(abs(posModel), vec3(1))))
+        if (abs(posModel.x) > 1 || abs(posModel.y) > 1 || abs(posModel.z) > 1)
             break;
 
         if (color.a < 1e-3)
@@ -101,38 +104,3 @@ void main() {
     color.a = 1.0 - color.a;
     outColor = color;
 }
-
-/*
-    vec4 skyColor = texture(samplerCubeMap, dirModel); // Assuming dirModel is the correct direction vector for the skybox
-
-    vec4 color = vec4(0, 0, 0, 0); // Start with fully transparent
-    vec3 posModel = inPosModel + dirModel * 1e-6;
-
-    for (int i = 0; i < numSteps; ++i) {
-        vec3 uvw = GetUVW(posModel);
-        float density = texture(densityTex, uvw).r;
-
-        if (density > 1e-3) {
-            float prevAlpha = color.a;
-            color.a += (1.0 - color.a) * BeerLambert(PushConstants.densityAbsorption * density, stepSize);
-            float absorptionFromMarch = color.a - prevAlpha;
-
-            color.rgb += absorptionFromMarch * volumeAlbedo * PushConstants.lightColor.xyz
-                         * density * HenyeyGreensteinPhase(PushConstants.lightDir.xyz, dirModel, PushConstants.aniso);
-        }
-
-        posModel += dirModel * stepSize;
-
-        if (any(greaterThan(abs(posModel), vec3(1))))
-            break;
-
-        if (color.a > 0.95) // Early exit if opaque
-            break;
-    }
-
-    // Blend with skyColor based on the accumulated alpha of the cloud
-    color.rgb = mix(skyColor.rgb, color.rgb, color.a);
-    color.a = 1.0; // Make sure the output is fully opaque
-
-    outColor = clamp(color, 0.0, 1.0);
-}*/

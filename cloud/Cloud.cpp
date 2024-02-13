@@ -9,34 +9,40 @@
 void CloudScene::guiRender()
 {
   ImGui::Begin("Scene controller");
-	ImGui::SliderFloat("lightAbsorptionCoeff", &constants.lightAbsorptionCoeff, 0, 20);
+	ImGui::SliderFloat("lightAbsorptionCoeff", &constants.lightAbsorptionCoeff, 0, 100);
 	ImGui::SliderFloat("densityAbsorption", &constants.densityAbsorption, 0, 100);
 	ImGui::SliderFloat("aniso", &constants.aniso, 0, 2);
-	ImGui::SliderFloat3("lightDir", &constants.lightDir.x, -4, 4);
+	ImGui::SliderFloat3("lightDir", &constants.lightDir.x, -1, 1);
 	ImGui::SliderFloat3("lightColor", &constants.lightColor.x, 0, 255);
 	ImGui::SliderFloat3("uvwOffset", &constants.uvwOffset.x, 0, 100);
-	ImGui::SliderFloat3("model translate", &modelTrans.x, -250, 250);
-	ImGui::SliderFloat3("model scale", &modelscale.x, 0, 50);
+	ImGui::SliderFloat3("model translate", &modelTrans.x, -400, 400);
+	ImGui::SliderFloat3("model scale", &modelscale.x, 0, 500);
 	ImGui::End();
 }
 
 void CloudScene::initialize(VulkanEngine* engine)
 {
   _engine = engine;
-	constants.lightAbsorptionCoeff = 5.0;
+	constants.lightAbsorptionCoeff = 10.0;
 	constants.lightDir = glm::vec4(0,1,0,0);
 	constants.densityAbsorption = 10.0;
 	constants.lightColor = glm::vec4(1.0f) * 40.0f;
 	constants.aniso = 0.3;
-	constants.uvwOffset = glm::vec4(1.0f,1.0f,1.0f, 0.0f);
-	constants.dt = 1.0f/120.0f;
-	modelTrans = glm::vec3(0,0,0);
-	modelscale = glm::vec3(1.0f);
+	// constants.uvwOffset = glm::vec4(0.f,0.f,0.f, 0.0f);
+	constants.uvwOffset = glm::vec4(1.0f);
+	constants.dt = 1.0f/ 120.0f;
+	modelTrans = glm::vec3(0,-0,0);
+	// modelscale = 25.0f;
+	modelscale = glm::vec3(10.0f);
+	imageWidth = 128*1;
+  imageHeight = 128*1;
+  imageDepth = 128*1;
   init_commands();
   init_sync_structures();
   init_image_buffer();
   initGenCloudPipelines();
   initMakeLightTexturePipelines();
+
 }
 
 void CloudScene::initRenderPipelines()
@@ -412,7 +418,6 @@ void CloudScene::makeLightTexture()
 {
   Material* computMaterial = _engine->get_material("MAKELIGHTTEXTURE");
 	VkCommandBuffer cmd = _engine->get_current_frame()._mainCommandBuffer;
-
   vkCmdPushConstants(cmd, computMaterial->pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CloudPushConstants), &constants);
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computMaterial->pipeline);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computMaterial->pipelineLayout, 0, 1, &computMaterial->textureSet, 0, nullptr);
@@ -434,21 +439,79 @@ void CloudScene::update(float dt)
 {
 	Camera cam = Camera::getInstance();
 	static int color = 0;
-	static float beforeX = cam._lastX * imageWidth / _engine->_windowExtent.width;
-  static float beforeY = cam._lastY * imageHeight / _engine->_windowExtent.height;
-
-	float curX = cam._lastX * imageWidth / _engine->_windowExtent.width;
-	float curY = cam._lastY * imageHeight / _engine->_windowExtent.height;
-
-	beforeX = curX;
-	beforeY = curY;
 	constants.uvwOffset += glm::vec4(constants.dt/4.0f, 0.,constants.dt/4.0f,0.);
-	
-	makeLightTexture();
+	if (color++ == 0){
+	}
   genCloud();
-
+	makeLightTexture();
 }
 
 void CloudScene::draw(VkCommandBuffer cmd)
 {
 }
+/*
+User
+You
+AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
+{
+	size_t data_size = size.depth * size.width * size.height * 4;
+	AllocatedBuffer uploadbuffer = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	AllocatedBuffer readbackBuffer = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_TO_CPU);
+
+	memcpy(uploadbuffer.info.pMappedData, data, data_size);
+	
+	AllocatedImage new_image = create_image(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
+
+	immediate_submit([&](VkCommandBuffer cmd) {
+		vkutil::transitionImageLayout(cmd, new_image._image, new_image._imageFormat,VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+		VkBufferImageCopy copyRegion = {};
+		copyRegion.bufferOffset = 0;
+		copyRegion.bufferRowLength = 0;
+		copyRegion.bufferImageHeight = 0;
+
+		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.imageSubresource.mipLevel = 0;
+		copyRegion.imageSubresource.baseArrayLayer = 0;
+		copyRegion.imageSubresource.layerCount = 1;
+		copyRegion.imageExtent = size;
+		copyRegion.imageOffset = {0, 0, 0};
+		// copy the buffer into the image
+		vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image._image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+			&copyRegion);
+
+		vkutil::transitionImageLayout(cmd, new_image._image,new_image._imageFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+			vkutil::transitionImageLayout(cmd, new_image._image, new_image._imageFormat,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0; // Tightly packed
+    region.bufferImageHeight = 0; // Tightly packed
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageExtent = size;
+
+    vkCmdCopyImageToBuffer(cmd, new_image._image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readbackBuffer.buffer, 1, &region);
+
+    // Transition back if necessary
+    vkutil::transitionImageLayout(cmd, new_image._image, new_image._imageFormat,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		});
+	std::cerr << *(uint32_t*)uploadbuffer.info.pMappedData << std::endl;
+	destroy_buffer(uploadbuffer);
+	void* mappedData;
+	vmaMapMemory(_allocator, readbackBuffer.allocation, &mappedData);
+	// Assuming the image format is VK_FORMAT_R8G8B8A8_UNORM and you're reading the entire image
+	uint32_t* pixels = static_cast<uint32_t*>(mappedData);
+	for (size_t i = 0; i < size.width * size.height; ++i) {
+			std::cout << std::hex << pixels[i] << " ";
+			if ((i + 1) % size.width == 0) std::cout << std::endl; // New line per image row
+	}
+	vmaUnmapMemory(_allocator, readbackBuffer.allocation);
+	destroy_buffer(readbackBuffer);
+	return new_image;
+}*/

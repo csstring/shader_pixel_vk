@@ -1153,12 +1153,12 @@ void VulkanEngine::update_scene()
 	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(200.0f));
 
 	// loadedScenes["plane_z"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
+	loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
 	loadedScenes["cloudCube"]->Draw(_cloud->getModelMatrix(), mainDrawContext);
 	// switch (_portalManager.getPortalState())
 	// {
 	// case PortalState::In_World1:
 		// loadedScenes["World2_InSkyBox"]->Draw(s, mainDrawContext);
-	loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
 	// 	// std::cout << "In_World1 " << std::endl;
 	// 	break;
 	// case PortalState::In_World2:
@@ -1241,15 +1241,23 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VulkanEngine* engine, Ma
 	{
 	case MaterialPass::Transparent:
 		matData.pipeline = &transparentPipeline;
+		resources.skyBoxImage = engine->_vulkanBoxImage;
+    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		break;
 	case MaterialPass::MainColor:
 		matData.pipeline = &opaquePipeline;
+		resources.skyBoxImage = engine->_vulkanBoxImage;
+    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		break;
 	case MaterialPass::Reflect:
 		matData.pipeline = &reflectPipeline;
+		resources.skyBoxImage = engine->_vulkanBoxImage;
+    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		break;
 	case MaterialPass::StencilFill:
 		matData.pipeline = &stencilFillPipeline;
+		resources.skyBoxImage = engine->_vulkanBoxImage;
+    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		break;
 	case MaterialPass::World1_InSkyBox:
 		matData.pipeline = &world_INskyBoxPipeline;
@@ -1477,10 +1485,9 @@ void GLTFMetallic_Roughness::build_cloudPipelines(VulkanEngine* engine)
 	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
 	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
 	pipelineBuilder._scissor= vkinit::scissor_create_info(engine->_windowExtent);
-	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
 	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
-	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-		VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT, false);
+	pipelineBuilder._colorBlendAttachment = vkinit::enable_blending_additive();
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 	pipelineBuilder._pipelineLayout = newLayout;
 

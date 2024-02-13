@@ -19,7 +19,8 @@ layout(push_constant) uniform Params {
 
 float BeerLambert(float absorptionCoefficient, float distanceTraveled)
 {
-    return exp(-abs(absorptionCoefficient * distanceTraveled));
+    // return 0.8f;
+    return exp(-absorptionCoefficient * distanceTraveled);
 }
 
 vec3 GetUVW(vec3 posModel)
@@ -29,23 +30,24 @@ vec3 GetUVW(vec3 posModel)
 
 float LightRay(vec3 posModel, vec3 lightDir)
 {
-    int numSteps = 128 / 4;
-    float stepSize = 2.0 / float(numSteps);
+    int numSteps = 128/4;
+    float stepSize = 2.0f / float(numSteps);
 
     float alpha = 1.0;
 
     for (int i = 0; i < numSteps; ++i)
     {
-        float density = texture(densityTex, GetUVW(posModel)).r;
+        float density = texture(densityTex, GetUVW(posModel)).x;
 
         if (density > 1e-3)
             alpha *= BeerLambert(PushConstants.lightAbsorptionCoeff * density, stepSize);
 
         posModel += lightDir * stepSize;
 
-        if (any(greaterThan(abs(posModel), vec3(1))))
+        // if (any(greaterThan(abs(posModel), vec3(1))))
+        //     break;
+        if (abs(posModel.x) > 1 || abs(posModel.y) > 1|| abs(posModel.z) > 1)
             break;
-
         if (alpha < 1e-3)
             break;
     }
@@ -57,8 +59,8 @@ layout (local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 void main() {
     ivec3 size = imageSize(lightingTex);
     ivec3 dtID = ivec3(gl_GlobalInvocationID.xyz);
-    vec3 uvw = (vec3(dtID) + 0.5) / vec3(size);
+    vec3 uvw = (vec3(dtID) / vec3(size)) + PushConstants.uvwOffset.xyz;
     
-    float alpha = LightRay((uvw - 0.5) * 2.0, PushConstants.lightDir.xyz);
+    float alpha = LightRay((uvw - 0.5) * 2.0, (PushConstants.lightDir).xyz);
     imageStore(lightingTex, dtID, vec4(alpha,0,0,0));
 }
