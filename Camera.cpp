@@ -35,7 +35,7 @@ void Camera::initialize(void)
     _isOn = false;
     _clickOn = false;
     _cameraPos = glm::vec3(0, 0 ,2.0);
-    _cameraUp = glm::vec3(0,-1,0);
+    _cameraUp = glm::vec3(0,1,0);
     _cameraFront = glm::vec3(0,0,-1.);
     _worldUp = _cameraUp;
     _zFar = 500;

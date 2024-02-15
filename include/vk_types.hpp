@@ -81,6 +81,7 @@ enum class MaterialPass :uint8_t {
     World1_outSkyBox,
     World2_InSkyBox,
     World2_outSkyBox,
+    SkySphere,
     Cloud,
     Reflect,
     StencilFill,

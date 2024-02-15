@@ -1,3 +1,4 @@
+#version 460
 #define PERFORMANCE_MODE 0
 #define ULTRA_MODE 0 
 
@@ -55,11 +56,37 @@
 #define SCENE_TYPE_OCEAN 1
 #define SCENE_TYPE_SIMPLIFIED_OCEAN 2
 #define SCENE_TYPE_OPAQUE 3
-
 float WaterIor;
-float WaterTurbulence;
+float WaterTurbulence = 25.f;
 float WaterAbsorption;
 vec3 WaterColor;
+
+// #extension GL_GOOGLE_include_directive : require
+// #include "input_structures.glsl"
+layout(set = 0, binding = 0) uniform  SceneData{   
+	vec4 ambientColor;
+	vec4 sunlightDirection; //w for sun power
+	vec4 sunlightColor;
+	vec4 viewPos;
+} sceneData;
+
+layout(set = 1, binding = 0) uniform GLTFMaterialData{   
+
+	vec4 colorFactors;
+	vec4 metal_rough_factors;
+	
+} materialData;
+
+layout(set = 1, binding = 1) uniform sampler2D colorTex;
+layout(set = 1, binding = 2) uniform sampler2D metalRoughTex;
+
+layout (location = 0) in vec3 inNormal;
+layout (location = 1) in vec3 inColor;
+layout (location = 2) in vec2 inUV;
+layout (location = 3) in vec3 inPos;
+layout (location = 4) in vec3 inViewPos;
+
+layout (location = 0) out vec4 outFragColor;
 
 // --------------------------------------------//
 //               Noise Functions

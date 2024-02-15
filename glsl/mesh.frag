@@ -36,8 +36,8 @@ float lightValue = max(dot(inNormal, sceneData.sunlightDirection.xyz), 0.1f);
 	*/
 void main() 
 {
-	vec4 color = texture(colorTex, inUV) * vec4(inColor, 1.0);
-	outFragColor = color;
+	// vec4 color = texture(colorTex, inUV) * vec4(inColor, 1.0);
+	outFragColor = texture(colorTex, inUV);
 	// vec3 N = normalize(inNormal);
 	// vec3 L = normalize(inLightVec);
 	// vec3 V = normalize(inViewVec);

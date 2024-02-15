@@ -17,23 +17,25 @@ void CloudScene::guiRender()
 	ImGui::SliderFloat3("uvwOffset", &constants.uvwOffset.x, 0, 100);
 	ImGui::SliderFloat3("model translate", &modelTrans.x, -400, 400);
 	ImGui::SliderFloat3("model scale", &modelscale.x, 0, 200);
+	ImGui::SliderFloat3("rot xyz", &rot.x, -1, 1);
+	ImGui::SliderFloat("rot degree", &rot.w, -3.14, 3.14);
 	ImGui::End();
 }
 
 void CloudScene::initialize(VulkanEngine* engine)
 {
   _engine = engine;
-	constants.lightAbsorptionCoeff = 10.0;
+	constants.lightAbsorptionCoeff = 20.0;
 	constants.lightDir = glm::vec4(0,1,0,0);
-	constants.densityAbsorption = 10.0;
+	constants.densityAbsorption = 60.0;
 	constants.lightColor = glm::vec4(1.0f) * 10.0f;
 	constants.aniso = 0.3;
 	// constants.uvwOffset = glm::vec4(0.f,0.f,0.f, 0.0f);
 	constants.uvwOffset = glm::vec4(1.0f);
 	constants.dt = 1.0f/ 720.0f;
-	modelTrans = glm::vec3(0,-0,-0);
-	// modelscale = 249.0f;
-	modelscale = glm::vec3(50, 50, 8);
+	modelTrans = glm::vec3(0,70,-0);
+	rot = glm::vec4(1,0,0, 3.14 / 2.0f);
+	modelscale = glm::vec3(250, 250, 35);
 	// imageWidth = 128*4;
   // imageHeight = 128*4;
   // imageDepth = 128/4;

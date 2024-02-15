@@ -48,6 +48,7 @@ void VulkanEngine::init()
 	load_meshes();
 	loadCubeMap(this, "./assets/textures/", "cubemap_vulkan.ktx", VK_FORMAT_R8G8B8A8_UNORM, &_vulkanBoxSamplerLinear, &_vulkanBoxImage);
 	loadCubeMap(this, "./assets/textures/", "cubemap_space.ktx", VK_FORMAT_R8G8B8A8_UNORM, &_spaceBoxSamplerLinear, &_spaceBoxImage);
+	loadKtxTexture(this, "./assets/textures/", "skysphere_rgba.ktx", VK_FORMAT_R8G8B8A8_UNORM, &_skySphereImage);
 	init_imgui();
 	_isInitialized = true;
 	_cloud = new CloudScene();
@@ -58,14 +59,15 @@ void VulkanEngine::init()
   // assert(FlightHelmetFile.has_value());
   // loadedScenes["FlightHelmet"] = *FlightHelmetFile;
 
-	auto sphere = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::StencilFill);
+	auto sphere = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::MainColor);
 	auto World1_InSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World1_InSkyBox);
 	auto World1_outSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World1_outSkyBox);
 	auto World2_InSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World2_InSkyBox);
 	auto World2_outSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World2_outSkyBox);
+	auto skysphere = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::SkySphere);
 	// auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
-	auto cloudCube = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(1.f)));
-	auto plane = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::StencilFill);
+	auto cloudCube = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::Cloud);
+	auto sand = loadGltf(this,"./assets/models/", "plane.gltf", MaterialPass::MainColor);
 	auto plane_z = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill);
 	auto plane_circle = loadGltf(this,"./assets/models/", "plane_circle.gltf", MaterialPass::StencilFill);
 
@@ -74,20 +76,21 @@ void VulkanEngine::init()
 	assert(World2_InSkyBox.has_value());
 	assert(World2_outSkyBox.has_value());
 	assert(sphere.has_value());
-	assert(plane.has_value());
+	assert(sand.has_value());
 	assert(plane_z.has_value());
 	assert(plane_circle.has_value());
 	assert(cloudCube.has_value());
-
+	assert(skysphere.has_value());
 	loadedScenes["World1_InSkyBox"] = *World1_InSkyBox;
 	loadedScenes["World1_outSkyBox"] = *World1_outSkyBox;
 	loadedScenes["World2_InSkyBox"] = *World2_InSkyBox;
 	loadedScenes["World2_outSkyBox"] = *World2_outSkyBox;
-	loadedScenes["sphereIn"] = *sphere;
-	loadedScenes["plane"] = *plane;
+	loadedScenes["sphere"] = *sphere;
+	loadedScenes["sand"] = *sand;
 	loadedScenes["plane_z"] = *plane_z;
 	loadedScenes["plane_circle"] = *plane_circle;
 	loadedScenes["cloudCube"] = *cloudCube;
+	loadedScenes["skysphere"] = *skysphere;
 }
 
 void VulkanEngine::init_vulkan()
@@ -1149,13 +1152,19 @@ void VulkanEngine::destroy_buffer(const AllocatedBuffer& buffer)
 void VulkanEngine::update_scene()
 {
 	Camera& _camera = Camera::getInstance();
-	_portalManager.update();
 	mainDrawContext.OpaqueSurfaces.clear();
-	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(50.0f));
-
-	// loadedScenes["plane_z"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
-	loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
-	loadedScenes["cloudCube"]->Draw(_cloud->getModelMatrix(), mainDrawContext);
+	//cloud render
+	// {
+	// _portalManager.update();
+	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(240.0f));
+	// loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
+	// }
+	glm::mat4 sandTransForm = glm::translate(glm::vec3(0, -40, 0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(150.0f));
+	glm::mat4 sprTransForm = glm::translate(glm::vec3(0, -40, 0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
+	// loadedScenes["skysphere"]->Draw(s, mainDrawContext);
+	// loadedScenes["cloudCube"]->Draw(_cloud->getModelMatrix(), mainDrawContext);
+	loadedScenes["sand"]->Draw(sandTransForm, mainDrawContext);
+	// loadedScenes["sphere"]->Draw(sprTransForm, mainDrawContext);
 	// switch (_portalManager.getPortalState())
 	// {
 	// case PortalState::In_World1:
@@ -1208,8 +1217,8 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 	PipelineBuilder pipelineBuilder;
-	pipelineBuilder.loadShader("./spv/mesh.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
-	pipelineBuilder.loadShader("./spv/mesh.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	pipelineBuilder.loadShader("./spv/sdfPrac.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
+	pipelineBuilder.loadShader("./spv/sdfPrac.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
 	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info(vertexDescription);
 	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
 	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
@@ -1297,6 +1306,13 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VulkanEngine* engine, Ma
 		writer.write_image(3, resources.skyBoxImage._imageView, resources.skyBoxSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		writer.update_set(engine->_device, matData.materialSet);
 		return matData;
+	case MaterialPass::SkySphere:
+		matData.pipeline = &opaquePipeline;
+		resources.colorImage = engine->_skySphereImage;
+    resources.colorSampler = engine->_defaultSamplerLinear;
+		resources.skyBoxImage = engine->_spaceBoxImage;
+    resources.skyBoxSampler = engine->_spaceBoxSamplerLinear;
+		break;
 	default:
 		break;
 	}

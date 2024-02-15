@@ -172,6 +172,7 @@ class VulkanEngine
     AllocatedImage _errorCheckerboardImage;
     AllocatedImage _vulkanBoxImage;
     AllocatedImage _spaceBoxImage;
+    AllocatedImage _skySphereImage;
 
     VkSampler _defaultSamplerLinear;
 	  VkSampler _defaultSamplerNearest;

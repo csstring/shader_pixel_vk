@@ -602,6 +602,34 @@ void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName
     ktxTexture_Destroy(ktxTexture);
 }   
 
+void loadKtxTexture(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format, AllocatedImage* newImage)
+{
+    ktxResult result;
+    ktxTexture* ktxTexture;
+    const std::string filePath = dirPath + fileName;
+    std::ifstream f(filePath.c_str());
+    if (f.fail()){
+        std::cerr << "load cube file path fail : " << filePath << std::endl;
+    }
+    result = ktxTexture_CreateFromNamedFile(filePath.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
+    assert(result == KTX_SUCCESS);
+    ktx_uint8_t *ktxTextureData = ktxTexture_GetData(ktxTexture);
+	ktx_size_t ktxTextureSize = ktxTexture_GetSize(ktxTexture);
+    VkExtent3D size;
+    size.width = ktxTexture->baseWidth;
+    size.height = ktxTexture->baseHeight;
+	size.depth = 1;
+    std::cout << size.width << std::endl;
+    std::cout << size.height << std::endl;
+    std::cout << size.depth << std::endl;
+    std::cout << ktxTextureSize << std::endl;
+    *newImage = engine->create_image((void*)ktxTextureData, size,format,VK_IMAGE_USAGE_SAMPLED_BIT );
+    engine->_mainDeletionQueue.push_function([=]() {
+        engine->destroy_image(*newImage);
+    });
+    ktxTexture_Destroy(ktxTexture);
+}  
+
 void LoadedGLTF::clearAll()
 {
     VkDevice dv = creator->_device;

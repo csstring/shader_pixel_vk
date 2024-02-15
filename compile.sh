@@ -1,6 +1,9 @@
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/mesh.vert -o ./spv/mesh.vert.spv
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/mesh.frag -o ./spv/mesh.frag.spv
 
+/Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/sdfPrac.vert -o ./spv/sdfPrac.vert.spv
+/Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/sdfPrac.frag -o ./spv/sdfPrac.frag.spv
+
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/skybox.vert -o ./spv/skybox.vert.spv
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/skybox.frag -o ./spv/skybox.frag.spv
 

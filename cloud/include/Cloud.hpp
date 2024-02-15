@@ -28,6 +28,7 @@ class CloudScene
     uint32_t imageWidth = 128;
     uint32_t imageHeight = 128;
     uint32_t imageDepth = 128;
+    glm::vec4 rot;
 
   public:
     VkSampler _defaultSamplerLinear;
@@ -39,7 +40,7 @@ class CloudScene
     CloudPushConstants constants;
     
     void initialize(VulkanEngine* engine);
-    glm::mat4 getModelMatrix(){return glm::translate(modelTrans) * glm::scale(modelscale);};
+    glm::mat4 getModelMatrix(){return glm::translate(modelTrans) * glm::rotate(glm::mat4(1.0f), rot.w, glm::vec3(rot)) * glm::scale(modelscale);};
     void uploadCubeMesh();
     void update(float dt);
     void draw(VkCommandBuffer cmd);
