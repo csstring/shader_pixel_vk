@@ -6,7 +6,7 @@
 #include "vk_initializers.hpp"
 #include "vk_types.hpp"
 #include <glm/gtx/quaternion.hpp>
-
+#include "glm/gtx/string_cast.hpp"
 #include "glm_element_traits.hpp"
 #include "parser.hpp"
 #include "tools.hpp"
@@ -460,6 +460,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
                     [&](glm::vec3 v, size_t index) {
                         Vertex newvtx;
                         newvtx.position = transfrom * glm::vec4(v,1.f);
+                        if (passType == MaterialPass::Cloud)
+                            std::cout << glm::to_string(newvtx.position) << std::endl;
                         newvtx.normal = { 1, 0, 0 };
                         newvtx.color = glm::vec4 { 1.f };
                         newvtx.uv = {0,0};

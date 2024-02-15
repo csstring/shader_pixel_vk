@@ -1,0 +1,4 @@
+light absor:71
+density absor: 100
+model trans 0 0 -27
+model scale 200 200 38

@@ -38,6 +38,7 @@ float HenyeyGreensteinPhase(vec3 L, vec3 V, float aniso) {
 }
 float sdSphere( vec3 p, float s )
 {
+    p.y = 0;
   return length(p)-s;
 }
 float sdTorus( vec3 p, vec2 t )
@@ -63,7 +64,7 @@ void main() {
     vec3 eyeModel = (worldInv * vec4(sceneData.viewPos)).xyz;
     vec3 dirModel = normalize(inPosModel - eyeModel);
 
-    int numSteps = 64;
+    int numSteps = 4;
     float stepSize = 2.0 / float(numSteps);
 
     vec3 volumeAlbedo = vec3(1, 1, 1);
@@ -76,10 +77,10 @@ void main() {
         float density = texture(densityTex, uvw).r;
         float lighting = texture(lightingTex, uvw).r; // Or sample lightingTex if needed이거 강의 봐봐야야함
 
-        float sdf = sdSphere(posModel, 0.9);
+        float sdf = sdSphere(posModel, 0.43);
 
         if (sdf > 0.0f){
-            density *= clamp(1.0-sdf*10.0f, 0.0,1.0f);
+            density *= clamp(1.0-sdf*9.0f, 0.0,1.0f);
         }
         if (density > 1e-3) {
             float prevAlpha = color.a;

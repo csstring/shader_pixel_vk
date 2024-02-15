@@ -19,7 +19,6 @@ layout(push_constant) uniform Params {
 
 float BeerLambert(float absorptionCoefficient, float distanceTraveled)
 {
-    // return 0.8f;
     return exp(-absorptionCoefficient * distanceTraveled);
 }
 

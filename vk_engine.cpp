@@ -59,11 +59,12 @@ void VulkanEngine::init()
   // loadedScenes["FlightHelmet"] = *FlightHelmetFile;
 
 	auto sphere = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::StencilFill);
-	auto World1_InSkyBox = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::World1_InSkyBox);
-	auto World1_outSkyBox = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::World1_outSkyBox);
-	auto World2_InSkyBox = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::World2_InSkyBox);
-	auto World2_outSkyBox = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::World2_outSkyBox);
-	auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
+	auto World1_InSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World1_InSkyBox);
+	auto World1_outSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World1_outSkyBox);
+	auto World2_InSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World2_InSkyBox);
+	auto World2_outSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World2_outSkyBox);
+	// auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
+	auto cloudCube = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(1.f)));
 	auto plane = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::StencilFill);
 	auto plane_z = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill);
 	auto plane_circle = loadGltf(this,"./assets/models/", "plane_circle.gltf", MaterialPass::StencilFill);
@@ -1150,7 +1151,7 @@ void VulkanEngine::update_scene()
 	Camera& _camera = Camera::getInstance();
 	_portalManager.update();
 	mainDrawContext.OpaqueSurfaces.clear();
-	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(200.0f));
+	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(50.0f));
 
 	// loadedScenes["plane_z"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
 	loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
@@ -1372,7 +1373,7 @@ void GLTFMetallic_Roughness::buildWorldSkyBoxpipelines(VulkanEngine* engine)
 	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
 	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
 	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(0xf, VK_FALSE);
-	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, false, VK_COMPARE_OP_LESS_OR_EQUAL);
+	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 	pipelineBuilder._pipelineLayout = newLayout;
 	
 	pipelineBuilder._depthStencil.stencilTestEnable = VK_TRUE;
@@ -1485,7 +1486,8 @@ void GLTFMetallic_Roughness::build_cloudPipelines(VulkanEngine* engine)
 	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
 	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
 	pipelineBuilder._scissor= vkinit::scissor_create_info(engine->_windowExtent);
-	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	// pipelineBuilder._rasterizer.rasterizerDiscardEnable = true;
 	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
 	pipelineBuilder._colorBlendAttachment = vkinit::enable_blending_additive();
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
