@@ -119,11 +119,12 @@ struct RenderObject {
 
 
 
-struct GPUSceneData {
+struct alignas(16) GPUSceneData {
     glm::vec4 ambientColor;
     glm::vec4 sunlightDirection; // w for sun power
     glm::vec4 sunlightColor;
     glm::vec4 viewPos;
+    float     iTime;
 };
 
 struct ComputeContext {

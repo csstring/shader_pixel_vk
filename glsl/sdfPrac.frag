@@ -33,10 +33,11 @@
 #endif
 
 #define GROUND_LEVEL 0.0
-#define WATER_LEVEL 22.0
+#define WATER_LEVEL 10.0
 #define PI 3.14
 #define LARGE_NUMBER 1e20
 #define EPSILON 0.0001
+
 
 #define NUM_SPHERES 5
 
@@ -57,10 +58,9 @@
 #define SCENE_TYPE_SIMPLIFIED_OCEAN 2
 #define SCENE_TYPE_OPAQUE 3
 float WaterIor;
-float WaterTurbulence = 25.f;
+float WaterTurbulence;
 float WaterAbsorption;
 vec3 WaterColor;
-
 // #extension GL_GOOGLE_include_directive : require
 // #include "input_structures.glsl"
 layout(set = 0, binding = 0) uniform  SceneData{   
@@ -68,6 +68,7 @@ layout(set = 0, binding = 0) uniform  SceneData{
 	vec4 sunlightDirection; //w for sun power
 	vec4 sunlightColor;
 	vec4 viewPos;
+    float iTime;
 } sceneData;
 
 layout(set = 1, binding = 0) uniform GLTFMaterialData{   
@@ -77,6 +78,19 @@ layout(set = 1, binding = 0) uniform GLTFMaterialData{
 	
 } materialData;
 
+layout(push_constant) uniform Params {
+    mat4 render_matrix;
+    mat4 view;
+	mat4 proj;
+    vec4 uvwOffset;
+    vec4 lightDir;
+    vec4 lightColor;
+    float lightAbsorptionCoeff;
+    float densityAbsorption;
+    float aniso;
+    float dt;
+} PushConstants;
+
 layout(set = 1, binding = 1) uniform sampler2D colorTex;
 layout(set = 1, binding = 2) uniform sampler2D metalRoughTex;
 
@@ -84,7 +98,7 @@ layout (location = 0) in vec3 inNormal;
 layout (location = 1) in vec3 inColor;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) in vec3 inPos;
-layout (location = 4) in vec3 inViewPos;
+layout (location = 4) in mat4 invModel;
 
 layout (location = 0) out vec4 outFragColor;
 
@@ -114,7 +128,7 @@ float noise( in vec3 x )
     float c = hash1(n+317.0);
     float d = hash1(n+318.0);
     float e = hash1(n+157.0);
-	  float f = hash1(n+158.0);
+	float f = hash1(n+158.0);
     float g = hash1(n+474.0);
     float h = hash1(n+475.0);
 
@@ -142,7 +156,7 @@ float fbm( in vec3 x, int iterations )
     float s = 0.5;
     float a = 0.0;
     float b = 0.5;
-    for( int i=min(0, iFrame); i<iterations; i++ )
+    for( int i= 0; i<iterations; i++ )
     {
         float n = noise(x);
         a += b*n;
@@ -200,11 +214,11 @@ struct Sphere
 void GetSphere(int index, out vec3 origin, out float radius)
 {
     Sphere spheres[NUM_SPHERES];
-    spheres[0] = Sphere(vec3(38, GROUND_LEVEL, 32), 12.0);
-    spheres[1] = Sphere(vec3(33, GROUND_LEVEL - 2.0, 20), 8.5);
-    spheres[2] = Sphere(vec3(-25, GROUND_LEVEL - 32.0, 55), 40.0);
-    spheres[3] = Sphere(vec3(-40, GROUND_LEVEL, 25), 12.0);
-    spheres[4] = Sphere(vec3(45, GROUND_LEVEL, 10), 12.0);
+    spheres[0] = Sphere(vec3(8, GROUND_LEVEL, 15), 2.0);
+    spheres[1] = Sphere(vec3(13, GROUND_LEVEL , 20), 2.5);
+    spheres[2] = Sphere(vec3(-5, GROUND_LEVEL , 5), 2.5);
+    spheres[3] = Sphere(vec3(-4, GROUND_LEVEL, 15), 4.0);
+    spheres[4] = Sphere(vec3(5, GROUND_LEVEL, 10), 3.0);
 
     origin = spheres[index].origin;
     radius = spheres[index].radius;
@@ -228,9 +242,9 @@ float QueryOceanDistanceField( in vec3 pos, float time)
 }
 
 float QueryVolumetricDistanceField( in vec3 pos, float time)
-{    
+{   
     float minDist = QueryOceanDistanceField(pos, time);
-    minDist = sdSmoothSubtraction(sdSphere(pos, vec3(0.0, 20.0, 0), 35.0) +  5.0 * fbm_4(pos / vec3(12, 20, 12)  - time / 5.0), minDist, 12.0);   
+    minDist = sdSmoothSubtraction(sdSphere(pos, vec3(0.0, 0.0, 0), 35.0) +  5.0 * fbm_4(pos / vec3(12, 20, 12)  - time / 5.0), minDist, 12.0);   
     minDist = sdSmoothUnion(minDist, sdPlane(pos - vec3(0, GROUND_LEVEL - 1.0, 0)), 13.0);
 
     return minDist;
@@ -289,7 +303,7 @@ float IntersectVolumetric(in vec3 rayOrigin, in vec3 rayDirection, float maxT, f
 vec3 GetVolumeNormal( in vec3 pos, float time, int sceneType )
 {
     vec3 n = vec3(0.0);
-    for( int i=min(0, iFrame); i<4; i++ )
+    for( int i= 0; i<4; i++ )
     {
         vec3 e = 0.5773*(2.0*vec3((((i+3)>>1)&1),((i>>1)&1),(i&1))-1.0);
         n += e*
@@ -299,22 +313,6 @@ vec3 GetVolumeNormal( in vec3 pos, float time, int sceneType )
     }
     return normalize(n);
 }
-
-struct CameraDescription
-{
-    vec3 Position;
-    vec3 LookAt;    
-
-    float LensHeight;
-    float FocalDistance;
-};
-    
-CameraDescription Camera = CameraDescription(
-    vec3(0, 10, -20),
-    vec3(0, 10, 0),
-    2.0,
-    1.6
-);
 
 struct Material
 {
@@ -409,7 +407,7 @@ float QueryOpaqueDistanceField(vec3 position, int objectID)
 vec3 GetOpaqueNormal( in vec3 pos, int objectID )
 {
     vec3 n = vec3(0.0);
-    for( int i=min(0, iFrame); i<4; i++ )
+    for( int i= 0; i<4; i++ )
     {
         vec3 e = 0.5773*(2.0*vec3((((i+3)>>1)&1),((i>>1)&1),(i&1))-1.0);
         n += e*QueryOpaqueDistanceField(pos+0.5*e, objectID);
@@ -424,7 +422,7 @@ float IntersectOpaqueScene(in vec3 rayOrigin, in vec3 rayDirection, out int obje
     float t = LARGE_NUMBER;
     objectID = INVALID_OBJECT_ID;
 
-    for(int i = min(0, iFrame); i < NUM_SPHERES; i++)
+    for(int i =  0; i < NUM_SPHERES; i++)
     {
         vec3 origin;
         float radius;
@@ -442,12 +440,12 @@ float IntersectOpaqueScene(in vec3 rayOrigin, in vec3 rayDirection, out int obje
         SAND_FLOOR_OBJECT_ID,
         objectID);
     
-    // Optimization for early-out on volume intersections
-    UpdateIfIntersected(
-        t,
-        PlaneIntersection(rayOrigin, rayDirection, vec3(0, WATER_LEVEL + MAX_WATER_DISPLACEMENT, 0), vec3(0, 1, 0)),
-        INVALID_OBJECT_ID,
-        objectID);
+
+    // UpdateIfIntersected(
+    //     t,
+    //     PlaneIntersection(rayOrigin, rayDirection, vec3(0, WATER_LEVEL + MAX_WATER_DISPLACEMENT, 0), vec3(0, 1, 0)),
+    //     INVALID_OBJECT_ID,
+    //     objectID);
 
     return t;
 }
@@ -474,14 +472,14 @@ vec3 GetShadowFactor(in vec3 rayOrigin, in vec3 rayDirection, in int maxSteps, i
     vec3 shadowFactor = vec3(1.0f);
     float signedDistance = 0.0;
     bool enteredVolume = false;
-    for(int i = min(0, iFrame); i < maxSteps; i++)
+    for(int i =  0; i < maxSteps; i++)
     {         
         float marchSize = max(minMarchSize, abs(signedDistance));
         t += marchSize;
 
         vec3 position = rayOrigin + t*rayDirection;
 
-        signedDistance = QueryVolumetricDistanceField(position, iTime);
+        signedDistance = QueryVolumetricDistanceField(position, sceneData.iTime);
         if(signedDistance < 0.0)
         {
             // Soften the shadows towards the edges to simulate an area light
@@ -534,7 +532,7 @@ vec3 GetApproximateShadowFactor(vec3 position, vec3 rayDirection)
 }
 
 float seed = 0.;
-float rand() { return fract(sin(seed++ + iTime)*43758.5453123); }
+float rand() { return fract(sin(seed++ + sceneData.iTime)*43758.5453123); }
 
 float smoothVoronoi( in vec2 x )
 {
@@ -584,7 +582,7 @@ vec3 GetAmbientShadowColor()
 
 float GetCloudDenity(vec3 position)
 {
-    float time = iTime * 0.25;
+    float time = sceneData.iTime * 0.25;
     vec3 noisePosition = position + vec3(0.0, 0.0, time);
     float noise = fbm_4(noisePosition);
     float noiseCutoff = -0.3;
@@ -654,7 +652,7 @@ vec3 SandParallaxOcclusionMapping(vec3 position, vec3 view)
 void CalculateLighting(vec3 position, vec3 view, int objectID, inout vec3 color, bool useFastLighting)
 {   
     Material material = GetMaterial(objectID);
-    float sdfValue = QueryVolumetricDistanceField(position, iTime);
+    float sdfValue = QueryVolumetricDistanceField(position, sceneData.iTime);
     bool bUnderWater = sdfValue < 0.0;
 
     float wetnessFactor = 0.0;
@@ -697,11 +695,11 @@ void CalculateLighting(vec3 position, vec3 view, int objectID, inout vec3 color,
         if(!useFastLighting)
         {
             // Fake caustics
-            float waterNoise = fract(GetWaterNoise(position, iTime));
+            float waterNoise = fract(GetWaterNoise(position, sceneData.iTime));
             float causticMultiplier = bUnderWater ? 7.0 : (1.0 - shadowFactor.r);
             color += material.albedo * causticMultiplier * 0.027 *  pow(
                 smoothVoronoi(position.xz / 4.0 + 
-                          vec2(iTime, iTime + 3.0) + 
+                          vec2(sceneData.iTime, sceneData.iTime + 3.0) + 
                           3.0 * vec2(cos(waterNoise), sin(waterNoise))), 5.0);
         }
         
@@ -709,20 +707,20 @@ void CalculateLighting(vec3 position, vec3 view, int objectID, inout vec3 color,
     
     // Add a bit of reflection to wet sand to make it look like 
     // there's some water left over
-    if(!useFastLighting && wetnessFactor > 0.0)
-    {
-        // Water fills in the holes in the sand and generally
-        // makes the surface planar so we can assume the normal is
-        // pointing straight up
-        vec3 wetNormal = vec3(0, 1, 0);
-        vec3 reflectionDirection = reflect(view, wetNormal);
-        float fresnel = FresnelFactor(AIR_IOR, WaterIor, wetNormal, view);
-        color += shadowFactor * wetnessFactor * fresnel * GetSkyColor(reflectionDirection);
-    }
+    // if(!useFastLighting && wetnessFactor > 0.0)
+    // {
+    //     // Water fills in the holes in the sand and generally
+    //     // makes the surface planar so we can assume the normal is
+    //     // pointing straight up
+    //     vec3 wetNormal = vec3(0, 1, 0);
+    //     vec3 reflectionDirection = reflect(view, wetNormal);
+    //     float fresnel = FresnelFactor(AIR_IOR, WaterIor, wetNormal, view);
+    //     color += shadowFactor * wetnessFactor * fresnel * GetSkyColor(reflectionDirection);
+    // }
     
     color += GetAmbientSkyColor() * material.albedo;
 }
-
+//Opaque 애들은 반사를 하면 안되는데 자꾸 하늘 색 가져오네 
 vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
 {
     vec3 accumulatedColor = vec3(0.0f);
@@ -733,191 +731,190 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
     vec3 opaquePosition = rayOrigin + t*rayDirection;
     
     bool outsideVolume = true;
-    for(int entry = 0; entry < MAX_VOLUME_ENTRIES; entry++) 
-    { 
-        if(!outsideVolume) break;
+    // for(int entry = 0; entry < MAX_VOLUME_ENTRIES; entry++) 
+    // { 
+    //     if(!outsideVolume) break;
         
-        bool firstEntry = (entry == 0);
-        bool intersectFound = false;
-        float volumeStart = 
-            IntersectVolumetric(
-                rayOrigin,
-                rayDirection, 
-                t, 
-                iTime,
-                (firstEntry ? SCENE_TYPE_OCEAN : SCENE_TYPE_SIMPLIFIED_OCEAN),
-                intersectFound);
-        
-        if(!intersectFound) break;
-		else
-        {
-            outsideVolume = false;
-            rayOrigin = rayOrigin + rayDirection * volumeStart;
-            vec3 volumeNormal = GetVolumeNormal(rayOrigin, iTime, SCENE_TYPE_OCEAN);
-            vec3 reflection = reflect( rayDirection, volumeNormal);
-            float fresnelFactor = FresnelFactor(AIR_IOR, WaterIor, volumeNormal, rayDirection);
-            float waterShininess = 100.0;
+    //     bool firstEntry = (entry == 0);
+    //     bool intersectFound = false;
+    //     //물 시작거리 IntersectOpaqueScene에서 구한 최대 거리 이상으로 나가면 intersectFound == false
+    //     float volumeStart = 
+    //         IntersectVolumetric(
+    //             rayOrigin,
+    //             rayDirection, 
+    //             t, 
+    //             sceneData.iTime,
+    //             (firstEntry ? SCENE_TYPE_OCEAN : SCENE_TYPE_SIMPLIFIED_OCEAN),
+    //             intersectFound);
+    
+    //     if(!intersectFound) break;
+	// 	else
+    //     {
+    //         outsideVolume = false;
+    //         rayOrigin = rayOrigin + rayDirection * volumeStart;// primary ray 도착지점q
+    //         vec3 volumeNormal = GetVolumeNormal(rayOrigin, sceneData.iTime, SCENE_TYPE_OCEAN);
+    //         vec3 reflection = reflect( rayDirection, volumeNormal);
+    //         float fresnelFactor = FresnelFactor(AIR_IOR, WaterIor, volumeNormal, rayDirection);
+    //         float waterShininess = 100.0;
 
-            float whiteWaterFactor = 0.0;
-            float whiteWaterMaxHeight = 5.0;
-            float groundBlendFactor = min(1.0, (rayOrigin.y - GROUND_LEVEL) * 0.75);
-            #if ADD_WHITE_WATER
-            if(firstEntry && rayOrigin.y <= whiteWaterMaxHeight)
-            {
-                WaterIor = mix(1.0, WaterIor, groundBlendFactor);
+    //         float whiteWaterFactor = 0.0;
+    //         float whiteWaterMaxHeight = 5.0;
+    //         float groundBlendFactor = min(1.0, (rayOrigin.y - GROUND_LEVEL) * 0.75);
+    //         #if ADD_WHITE_WATER
+    //         if(firstEntry && rayOrigin.y <= whiteWaterMaxHeight)
+    //         {
+    //             WaterIor = mix(1.0, WaterIor, groundBlendFactor);
                 
-                vec3 voronoisePosition = rayOrigin / 1.5 + vec3(0, -iTime * 2.0, sin(iTime));
-            	float noiseValue = abs(fbm(voronoisePosition, 2));
-            	voronoisePosition += 1.0 * vec3(cos(noiseValue), 0.0, sin(noiseValue));
+    //             vec3 voronoisePosition = rayOrigin / 1.5 + vec3(0, -sceneData.iTime * 2.0, sin(sceneData.iTime));
+    //         	float noiseValue = abs(fbm(voronoisePosition, 2));
+    //         	voronoisePosition += 1.0 * vec3(cos(noiseValue), 0.0, sin(noiseValue));
                 
-                float heightLerp =  (whiteWaterMaxHeight - rayOrigin.y) / whiteWaterMaxHeight;
-                whiteWaterFactor = abs(smoothVoronoi(voronoisePosition.xz)) * heightLerp;
-                whiteWaterFactor = clamp(whiteWaterFactor, 0.0, 1.0);
-                whiteWaterFactor = pow(whiteWaterFactor, 0.2) * heightLerp;
-                whiteWaterFactor *= mix(abs(fbm(rayOrigin + vec3(0, -iTime * 5.0, 0), 2)), 1.0, heightLerp);
-                whiteWaterFactor *= groundBlendFactor;
+    //             float heightLerp =  (whiteWaterMaxHeight - rayOrigin.y) / whiteWaterMaxHeight;
+    //             whiteWaterFactor = abs(smoothVoronoi(voronoisePosition.xz)) * heightLerp;
+    //             whiteWaterFactor = clamp(whiteWaterFactor, 0.0, 1.0);
+    //             whiteWaterFactor = pow(whiteWaterFactor, 0.2) * heightLerp;
+    //             whiteWaterFactor *= mix(abs(fbm(rayOrigin + vec3(0, -sceneData.iTime * 5.0, 0), 2)), 1.0, heightLerp);
+    //             whiteWaterFactor *= groundBlendFactor;
                 
-                vec3 shadowFactor =  GetShadowFactor(rayOrigin, GetSunLightDirection(), MAX_OPAQUE_SHADOW_MARCH_STEPS, SHADOW_FACTOR_STEP_SIZE);
-                vec3 diffuse = 0.5 * shadowFactor * GetSunLightColor() + 
-                    0.7 * shadowFactor * mix(GetAmbientShadowColor(), GetSunLightColor(), max(0.0, dot(volumeNormal, GetSunLightDirection())));
-                accumulatedColor += vec3(whiteWaterFactor) * (
-                    diffuse +
-                    shadowFactor * Specular(reflection, GetSunLightDirection(), 30.0) * GetSunLightColor() +
-            		GetAmbientSkyColor());
-            }
-            #endif
-            accumulatedColorMultiplier *= (1.0 - whiteWaterFactor);
-            rayDirection = refract(rayDirection, volumeNormal, AIR_IOR / WaterIor);
+    //             vec3 shadowFactor =  GetShadowFactor(rayOrigin, GetSunLightDirection(), MAX_OPAQUE_SHADOW_MARCH_STEPS, SHADOW_FACTOR_STEP_SIZE);
+    //             vec3 diffuse = 0.5 * shadowFactor * GetSunLightColor() + 
+    //                 0.7 * shadowFactor * mix(GetAmbientShadowColor(), GetSunLightColor(), max(0.0, dot(volumeNormal, GetSunLightDirection())));
+    //             accumulatedColor += vec3(whiteWaterFactor) * (
+    //                 diffuse +
+    //                 shadowFactor * Specular(reflection, GetSunLightDirection(), 30.0) * GetSunLightColor() +
+    //         		GetAmbientSkyColor());
+    //         }
+    //         #endif
+    //         accumulatedColorMultiplier *= (1.0 - whiteWaterFactor);
+    //         rayDirection = refract(rayDirection, volumeNormal, AIR_IOR / WaterIor); //공기에서 물로 진입 하는 굴절 
             
-            accumulatedColor += accumulatedColorMultiplier * Specular(reflection, GetSunLightDirection(), waterShininess) * GetSunLightColor();
-            accumulatedColor += accumulatedColorMultiplier * fresnelFactor * GetSkyColor(reflection);
-            accumulatedColorMultiplier *= (1.0 - fresnelFactor);
+    //         accumulatedColor += accumulatedColorMultiplier * Specular(reflection, GetSunLightDirection(), waterShininess) * GetSunLightColor();
+    //         accumulatedColor += accumulatedColorMultiplier * fresnelFactor * GetSkyColor(reflection); //물에 반사된 빛이 하늘을 향할거라는 가정
+    //         accumulatedColorMultiplier *= (1.0 - fresnelFactor);
             
-            // recalculate opaque depth now that the ray has been refracted
-            t = IntersectOpaqueScene(rayOrigin, rayDirection, materialID);
-            if( materialID != INVALID_OBJECT_ID )
-            {
-                opaquePosition = rayOrigin + t*rayDirection;
-            }
+    //         // recalculate opaque depth now that the ray has been refracted
+    //         t = IntersectOpaqueScene(rayOrigin, rayDirection, materialID);
+    //         if( materialID != INVALID_OBJECT_ID )
+    //         {
+    //             opaquePosition = rayOrigin + t*rayDirection;
+    //         }
 
-            float volumeDepth = 0.0f;
-            float signedDistance = 0.0;
-            int i = 0;
-            vec3 marchPosition = vec3(0);
-            float minStepSize = SDF_START_STEP_SIZE;
-            float minStepIncrement = float(SDF_END_STEP_SIZE - SDF_START_STEP_SIZE) / float(MAX_VOLUME_MARCH_STEPS);
-            for(; i < MAX_VOLUME_MARCH_STEPS; i++)
-            {
-                float marchSize = max(minStepSize, signedDistance);
-				minStepSize += minStepIncrement;
+    //         float volumeDepth = 0.0f;
+    //         float signedDistance = 0.0;
+    //         vec3 marchPosition = vec3(0);
+    //         float minStepSize = SDF_START_STEP_SIZE;
+    //         float minStepIncrement = float(SDF_END_STEP_SIZE - SDF_START_STEP_SIZE) / float(MAX_VOLUME_MARCH_STEPS);
+    //         for(int i = 0; i < MAX_VOLUME_MARCH_STEPS; i++)
+    //         {
+    //             float marchSize = max(minStepSize, signedDistance);
+	// 			minStepSize += minStepIncrement;
                 
-                vec3 nextMarchPosition = rayOrigin + (volumeDepth + marchSize) * rayDirection;
-                signedDistance = QueryOceanDistanceField(nextMarchPosition, iTime);
-                if(signedDistance > 0.0f)
-                {
-                    float start = 0.0;
-                    float end = marchSize;
+    //             vec3 nextMarchPosition = rayOrigin + (volumeDepth + marchSize) * rayDirection;
+    //             signedDistance = QueryOceanDistanceField(nextMarchPosition, sceneData.iTime);
+    //             if(signedDistance > 0.0f)
+    //             {
+    //                 float start = 0.0;
+    //                 float end = marchSize;
 
-                    for(int j = 0; j < BINARY_SEARCH_STEPS; j++)
-                    {
-                        float midPoint = (start + end) * 0.5;
-                        vec3 nextMarchPosition = rayOrigin + (volumeDepth + midPoint) * rayDirection;
-                        float sdfValue = QueryVolumetricDistanceField(nextMarchPosition, iTime);
+    //                 for(int j = 0; j < BINARY_SEARCH_STEPS; j++)
+    //                 {
+    //                     float midPoint = (start + end) * 0.5;
+    //                     vec3 nextMarchPosition = rayOrigin + (volumeDepth + midPoint) * rayDirection;
+    //                     float sdfValue = QueryVolumetricDistanceField(nextMarchPosition, sceneData.iTime);
 
-                        // Use the SDF to nudget the mid point closer to the actual edge
-                        midPoint = clamp(midPoint - sdfValue, start, end);
-                        if(sdfValue > 0.0)
-                        {
-                            end = midPoint;
-                        }
-                        else
-                        {
-                            start = midPoint;
-                        }
-                    }
-                    marchSize = end;
-                }
+    //                     // Use the SDF to nudget the mid point closer to the actual edge
+    //                     midPoint = clamp(midPoint - sdfValue, start, end);
+    //                     if(sdfValue > 0.0)
+    //                     {
+    //                         end = midPoint;
+    //                     }
+    //                     else
+    //                     {
+    //                         start = midPoint;
+    //                     }
+    //                 }
+    //                 marchSize = end;
+    //             }
 
-                volumeDepth += marchSize;
-                marchPosition = rayOrigin + volumeDepth*rayDirection;
+    //             volumeDepth += marchSize;
+    //             marchPosition = rayOrigin + volumeDepth*rayDirection;
 
-                if(volumeDepth > t)
-                {
-                    intersectFound = true;
-                    volumeDepth = min(volumeDepth, t);
-                    break;
-                }
+    //             if(volumeDepth > t) //불투명 물체 만났음 바닥, 돌,...
+    //             {
+    //                 intersectFound = true;
+    //                 volumeDepth = min(volumeDepth, t);
+    //                 break;
+    //             }
 
-                vec3 previousLightFactor = accumulatedColorMultiplier;
-                accumulatedColorMultiplier *= BeerLambert(vec3(WaterAbsorption) / WaterColor, marchSize);
-                vec3 absorptionFromMarch = previousLightFactor - accumulatedColorMultiplier;
+    //             vec3 previousLightFactor = accumulatedColorMultiplier;
+    //             accumulatedColorMultiplier *= BeerLambert(vec3(WaterAbsorption) / WaterColor, marchSize);
+    //             vec3 absorptionFromMarch = previousLightFactor - accumulatedColorMultiplier;
 
-                accumulatedColor += accumulatedColorMultiplier * WaterColor * absorptionFromMarch * 
-                    GetSunLightColor() * GetApproximateShadowFactor(marchPosition, GetSunLightDirection());
-                accumulatedColor += accumulatedColorMultiplier * absorptionFromMarch * GetAmbientSkyColor();
+    //             accumulatedColor += accumulatedColorMultiplier * WaterColor * absorptionFromMarch * 
+    //                 GetSunLightColor() * GetApproximateShadowFactor(marchPosition, GetSunLightDirection());
+    //             accumulatedColor += accumulatedColorMultiplier * absorptionFromMarch * GetAmbientSkyColor();
 
-                if(signedDistance > 0.0)
-                {
-                    intersectFound = true;
-                    outsideVolume = true;
-                    break;
-                }
-            }
+    //             if(signedDistance > 0.0)//물밖으로 탈출
+    //             {
+    //                 intersectFound = true;
+    //                 outsideVolume = true;
+    //                 break;
+    //             }
+    //         }
 
-            if(intersectFound && outsideVolume)
-            {
-                // Flip the normal since we're coming from inside the volume
-                vec3 exitNormal = -GetVolumeNormal(marchPosition, iTime, SCENE_TYPE_SIMPLIFIED_OCEAN);                    
+    //         if(intersectFound && outsideVolume)
+    //         {
+    //             // Flip the normal since we're coming from inside the volume
+    //             vec3 exitNormal = -GetVolumeNormal(marchPosition, sceneData.iTime, SCENE_TYPE_SIMPLIFIED_OCEAN);                    
 
-                #if SECONDARY_REFLECTION
-                float fresnelFactor = max(0.2, FresnelFactor(WaterIor, AIR_IOR, exitNormal, rayDirection));
-                vec3 reflection = reflect(rayDirection, exitNormal);
-                int reflectedMaterialID;
-                float reflectionT = IntersectOpaqueScene(marchPosition, reflection, reflectedMaterialID);
-                if( reflectedMaterialID != INVALID_OBJECT_ID )
-                {
-                    vec3 pos = marchPosition + reflection*reflectionT;
-                    Material material = GetMaterial(reflectedMaterialID);
-                    vec3 color = vec3(0);
-                    CalculateLighting(pos,reflection, reflectedMaterialID, color, true);
-                    accumulatedColor += accumulatedColorMultiplier * fresnelFactor * color;
-                }
-                else
-                {
-                    accumulatedColor += fresnelFactor * accumulatedColorMultiplier * GetSkyColor(rayDirection);
-
-                }
-                accumulatedColorMultiplier *= (1.0 - fresnelFactor);
-                #endif
+    //             #if SECONDARY_REFLECTION
+    //             float fresnelFactor = max(0.2, FresnelFactor(WaterIor, AIR_IOR, exitNormal, rayDirection));
+    //             vec3 reflection = reflect(rayDirection, exitNormal);
+    //             int reflectedMaterialID;
+    //             float reflectionT = IntersectOpaqueScene(marchPosition, reflection, reflectedMaterialID);
+    //             if( reflectedMaterialID != INVALID_OBJECT_ID )
+    //             {
+    //                 vec3 pos = marchPosition + reflection*reflectionT;
+    //                 Material material = GetMaterial(reflectedMaterialID);
+    //                 vec3 color = vec3(0);
+    //                 CalculateLighting(pos,reflection, reflectedMaterialID, color, true);
+    //                 accumulatedColor += accumulatedColorMultiplier * fresnelFactor * color;
+    //             }
+    //             else
+    //             {
+    //                 accumulatedColor += fresnelFactor * accumulatedColorMultiplier * GetSkyColor(rayDirection);
+    //             }
+    //             accumulatedColorMultiplier *= (1.0 - fresnelFactor);
+    //             #endif
                 
-                rayDirection = refract(rayDirection, exitNormal, WaterIor / AIR_IOR);
-                rayOrigin = marchPosition;
-                t = IntersectOpaqueScene(marchPosition, rayDirection, materialID);
-                if( materialID != INVALID_OBJECT_ID )
-                {
-                    opaquePosition = rayOrigin + t*rayDirection;
-                }
-                outsideVolume = true;
-            }
+    //             rayDirection = refract(rayDirection, exitNormal, WaterIor / AIR_IOR);
+    //             rayOrigin = marchPosition;
+    //             t = IntersectOpaqueScene(marchPosition, rayDirection, materialID);
+    //             if( materialID != INVALID_OBJECT_ID )
+    //             {
+    //                 opaquePosition = rayOrigin + t*rayDirection;
+    //             }
+    //             outsideVolume = true;
+    //         }
 
-            if(!intersectFound)
-            {
-                float t = GetApproximateIntersect(marchPosition, rayDirection);
-                float halfT = t / 2.0;
-                vec3 halfwayPosition = marchPosition + rayDirection * halfT;
-                vec3 shadowFactor = GetApproximateShadowFactor(halfwayPosition, GetSunLightDirection());
+    //         if(!intersectFound)
+    //         {
+    //             float t = GetApproximateIntersect(marchPosition, rayDirection);
+    //             float halfT = t / 2.0;
+    //             vec3 halfwayPosition = marchPosition + rayDirection * halfT;
+    //             vec3 shadowFactor = GetApproximateShadowFactor(halfwayPosition, GetSunLightDirection());
 
-                vec3 previousLightFactor = accumulatedColorMultiplier;
-                accumulatedColorMultiplier *= BeerLambert(WaterAbsorption / WaterColor, t);
-                vec3 absorptionFromMarch = previousLightFactor - accumulatedColorMultiplier;
-                accumulatedColor += accumulatedColorMultiplier * WaterColor * shadowFactor * absorptionFromMarch * GetSunLightColor();
-                accumulatedColor += accumulatedColorMultiplier * WaterColor * GetAmbientSkyColor() * absorptionFromMarch;
+    //             vec3 previousLightFactor = accumulatedColorMultiplier;
+    //             accumulatedColorMultiplier *= BeerLambert(WaterAbsorption / WaterColor, t);
+    //             vec3 absorptionFromMarch = previousLightFactor - accumulatedColorMultiplier;
+    //             accumulatedColor += accumulatedColorMultiplier * WaterColor * shadowFactor * absorptionFromMarch * GetSunLightColor();
+    //             accumulatedColor += accumulatedColorMultiplier * WaterColor * GetAmbientSkyColor() * absorptionFromMarch;
 
-                volumeDepth += t;
-                rayOrigin = rayOrigin + volumeDepth*rayDirection;
-            }
-        }
-    }
+    //             volumeDepth += t;
+    //             rayOrigin = rayOrigin + volumeDepth*rayDirection;
+    //         }
+    //     }
+    // }
     
     vec3 opaqueColor = vec3(0.0f);
     if(materialID != INVALID_OBJECT_ID)
@@ -925,69 +922,70 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
         CalculateLighting(opaquePosition,
                           rayDirection,
                           materialID, opaqueColor,
-                          false);
+                          true);
+
     }
     else
     {
         opaqueColor = GetSkyColor(rayDirection);
     }
-    
-    return accumulatedColor + accumulatedColorMultiplier * opaqueColor;
+    return opaqueColor;
+    // return accumulatedColor + accumulatedColorMultiplier * opaqueColor;
 }
 
-mat3 GetViewMatrix(float xRotationFactor)
-{ 
-   float xRotation = ((1.0 - xRotationFactor) - 0.5) * PI * 0.2;
-   return mat3( cos(xRotation), 0.0, sin(xRotation),
-                0.0,           1.0, 0.0,    
-                -sin(xRotation),0.0, cos(xRotation));
-}
+// mat3 GetViewMatrix(float xRotationFactor)
+// { 
+//    float xRotation = ((1.0 - xRotationFactor) - 0.5) * PI * 0.2;
+//    return mat3( cos(xRotation), 0.0, sin(xRotation),
+//                 0.0,           1.0, 0.0,    
+//                 -sin(xRotation),0.0, cos(xRotation));
+// }
 
-float GetRotationFactor()
-{
-    return iMouse.x / iResolution.x;
-}
+// float GetRotationFactor()
+// {
+//     return iMouse.x / iResolution.x;
+// }
 
-bool IsInputThread(in vec2 fragCoord)
-{
-    return ALLOW_KEYBOARD_INPUT != 0 && int(fragCoord.x) == 0 && int(fragCoord.y) == 0;
-}
+// bool IsInputThread(in vec2 fragCoord)
+// {
+//     return ALLOW_KEYBOARD_INPUT != 0 && int(fragCoord.x) == 0 && int(fragCoord.y) == 0;
+// }
    
 
-bool KeyDown(int char)
-{
-    return int(texelFetch(iChannel1, ivec2(char, 0), 0).x) > 0;
-}
+// bool KeyDown(int char)
+// {
+//     return int(texelFetch(iChannel1, ivec2(char, 0), 0).x) > 0;
+// }
 
-void ProcessInput()
-{
-    const float WaterIorChangeRate = 0.35;
-	if(KeyDown(87)) WaterIor += WaterIorChangeRate * iTimeDelta;
-    if(KeyDown(83)) WaterIor -= WaterIorChangeRate * iTimeDelta;
-    WaterIor = clamp(WaterIor, 1.0, 1.8);
+// void ProcessInput()
+// {
+//     const float WaterIorChangeRate = 0.35;
+// 	if(KeyDown(87)) WaterIor += WaterIorChangeRate * iTimeDelta;
+//     if(KeyDown(83)) WaterIor -= WaterIorChangeRate * iTimeDelta;
+//     WaterIor = clamp(WaterIor, 1.0, 1.8);
     
-    const float WaterTurbulanceChangeRate = 7.0;
-	if(KeyDown(69)) WaterTurbulence += WaterTurbulanceChangeRate * iTimeDelta;
-    if(KeyDown(68)) WaterTurbulence -= WaterTurbulanceChangeRate * iTimeDelta;
-    WaterTurbulence = clamp(WaterTurbulence, 0.0, 50.0);
+//     const float WaterTurbulanceChangeRate = 7.0;
+// 	if(KeyDown(69)) WaterTurbulence += WaterTurbulanceChangeRate * iTimeDelta;
+//     if(KeyDown(68)) WaterTurbulence -= WaterTurbulanceChangeRate * iTimeDelta;
+//     WaterTurbulence = clamp(WaterTurbulence, 0.0, 50.0);
        
-    const float WaterAbsorptionChangeRate = 0.03;
-	if(KeyDown(81)) WaterAbsorption += WaterAbsorptionChangeRate * iTimeDelta;
-    if(KeyDown(65)) WaterAbsorption -= WaterAbsorptionChangeRate * iTimeDelta;
-    WaterAbsorption = clamp(WaterAbsorption, 0.0, 1.0);
+//     const float WaterAbsorptionChangeRate = 0.03;
+// 	if(KeyDown(81)) WaterAbsorption += WaterAbsorptionChangeRate * iTimeDelta;
+//     if(KeyDown(65)) WaterAbsorption -= WaterAbsorptionChangeRate * iTimeDelta;
+//     WaterAbsorption = clamp(WaterAbsorption, 0.0, 1.0);
     
-    const float ColorChangeRate = 0.5;
-	if(KeyDown(89)) WaterColor.r += ColorChangeRate * iTimeDelta;
-    if(KeyDown(72)) WaterColor.r -= ColorChangeRate * iTimeDelta;
+//     const float ColorChangeRate = 0.5;
+// 	if(KeyDown(89)) WaterColor.r += ColorChangeRate * iTimeDelta;
+//     if(KeyDown(72)) WaterColor.r -= ColorChangeRate * iTimeDelta;
     
-    if(KeyDown(85)) WaterColor.g += ColorChangeRate * iTimeDelta;
-    if(KeyDown(74)) WaterColor.g -= ColorChangeRate * iTimeDelta;
+//     if(KeyDown(85)) WaterColor.g += ColorChangeRate * iTimeDelta;
+//     if(KeyDown(74)) WaterColor.g -= ColorChangeRate * iTimeDelta;
     
-    if(KeyDown(73)) WaterColor.b += ColorChangeRate * iTimeDelta;
-    if(KeyDown(75)) WaterColor.b -= ColorChangeRate * iTimeDelta;
+//     if(KeyDown(73)) WaterColor.b += ColorChangeRate * iTimeDelta;
+//     if(KeyDown(75)) WaterColor.b -= ColorChangeRate * iTimeDelta;
     
-    WaterColor = clamp(WaterColor, 0.05, 0.99);
-}
+//     WaterColor = clamp(WaterColor, 0.05, 0.99);
+// }
 
 float EncodeWaterColor()
 {
@@ -1006,21 +1004,21 @@ void DecodeWaterColor(float data)
 
 void LoadConstants()
 {
-    if(iFrame == 0 || KeyDown(82) || ALLOW_KEYBOARD_INPUT == 0)
+    // if(iFrame == 0 || KeyDown(82) || ALLOW_KEYBOARD_INPUT == 0)
     {
-        WaterColor = vec3(0.1, 0.82, 1.0);
+        WaterColor = vec3(0.02, 0.25, 0.53);
         WaterIor = 1.33; // Actual IOR of water
         WaterTurbulence = 2.5;
         WaterAbsorption = 0.028;
     }
-    else
-    {
-        vec4 data = texelFetch(iChannel0, ivec2(0, 0), 0);
-        WaterIor = data.r;
-        WaterTurbulence = data.g;
-        WaterAbsorption = data.b;
-        DecodeWaterColor(data.a);
-    }
+    // else
+    // {
+    //     vec4 data = texelFetch(iChannel0, ivec2(0, 0), 0);
+    //     WaterIor = data.r;
+    //     WaterTurbulence = data.g;
+    //     WaterAbsorption = data.b;
+    //     DecodeWaterColor(data.a);
+    // }
 }
      
 vec3 GammaCorrect(vec3 color) 
@@ -1028,46 +1026,23 @@ vec3 GammaCorrect(vec3 color)
     return pow(color, vec3(1.0/2.2));
 }
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
+void main()
 {
     LoadConstants();
     
     // Sacrafice 1 pixel so that we can save up updates from input
-    if(IsInputThread(fragCoord))
-    {
-        ProcessInput();
-        fragColor = vec4(WaterIor, WaterTurbulence, WaterAbsorption, EncodeWaterColor());
-        return;
-    }
+    // if(IsInputThread(fragCoord))
+    // {
+    //     ProcessInput();
+    //     fragColor = vec4(WaterIor, WaterTurbulence, WaterAbsorption, EncodeWaterColor());
+    //     return;
+    // } 
     
-    vec2 uv = fragCoord.xy / iResolution.xy;
-    
-    float aspectRatio = iResolution.x /  iResolution.y; 
-    float lensWidth = Camera.LensHeight * aspectRatio;
-    
-    vec3 NonNormalizedCameraView = Camera.LookAt - Camera.Position;
-    float ViewLength = length(NonNormalizedCameraView);
-    vec3 CameraView = NonNormalizedCameraView / ViewLength;
-
-    vec3 lensPoint = Camera.Position;
-    
-    // Pivot the camera around the look at point
-    float rotationFactor = GetRotationFactor();
-    mat3 viewMatrix = GetViewMatrix(rotationFactor);
-    CameraView = CameraView * viewMatrix;
-    lensPoint = Camera.LookAt - CameraView * ViewLength;
-    
-    vec3 CameraRight = cross(CameraView, vec3(0, 1, 0));    
-    vec3 CameraUp = cross(CameraRight, CameraView);
-
-    vec3 focalPoint = lensPoint - Camera.FocalDistance * CameraView;
-    lensPoint += CameraRight * (uv.x * 2.0 - 1.0) * lensWidth / 2.0;
-    lensPoint += CameraUp * (uv.y * 2.0 - 1.0) * Camera.LensHeight / 2.0;
-    
-    vec3 rayOrigin = focalPoint;
-    vec3 rayDirection = normalize(lensPoint - focalPoint);
-    
-    vec3 color = Render(rayOrigin, rayDirection);
-    fragColor=vec4(GammaCorrect(color), 1.0 );
+    // float3 ray = -normalize(eyeWorld - input.posWorld);
+    vec3 rayOrigin = sceneData.viewPos.xyz;
+    vec3 rayDirection = (inPos - rayOrigin);
+    // rayDirection.y *= -1;
+    vec3 color = Render(rayOrigin, normalize(rayDirection));
+    outFragColor=vec4(GammaCorrect(color), 1.0 );
 }
 

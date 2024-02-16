@@ -760,6 +760,7 @@ void VulkanEngine::init_scene()
 
 void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject* first, int count)
 {
+
 	AllocatedBuffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	Camera& _camera = Camera::getInstance();
 	//add it to the deletion queue of this frame so it gets deleted once its been used
@@ -784,6 +785,7 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject* first, int co
 	pushConstants.proj = _camera.getProjection();
 	pushConstants.proj[1][1] *= -1;
 	
+
 	for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces)
 	{
 		VkDeviceSize offset = 0;
@@ -1151,6 +1153,8 @@ void VulkanEngine::destroy_buffer(const AllocatedBuffer& buffer)
 
 void VulkanEngine::update_scene()
 {
+	static auto start = std::chrono::high_resolution_clock::now();
+	auto now = std::chrono::high_resolution_clock::now();
 	Camera& _camera = Camera::getInstance();
 	mainDrawContext.OpaqueSurfaces.clear();
 	//cloud render
@@ -1159,7 +1163,7 @@ void VulkanEngine::update_scene()
 	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(240.0f));
 	// loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
 	// }
-	glm::mat4 sandTransForm = glm::translate(glm::vec3(0, -40, 0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(150.0f));
+	glm::mat4 sandTransForm = glm::translate(glm::vec3(0, -50, -0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(40.0f));
 	glm::mat4 sprTransForm = glm::translate(glm::vec3(0, -40, 0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
 	// loadedScenes["skysphere"]->Draw(s, mainDrawContext);
 	// loadedScenes["cloudCube"]->Draw(_cloud->getModelMatrix(), mainDrawContext);
@@ -1181,7 +1185,10 @@ void VulkanEngine::update_scene()
 	// 	break;
 	// }
 	// sceneData.viewPos = _camera._view * glm::vec4(_camera._cameraPos, 1.0f);
+	std::chrono::duration<float> elapsed = now - start;
 	sceneData.viewPos = glm::vec4(_camera._cameraPos,1);
+	sceneData.iTime = elapsed.count();
+	// std::cout << sceneData.iTime << std::endl; 
 }
 
 void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
