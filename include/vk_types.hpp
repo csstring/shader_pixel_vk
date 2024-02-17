@@ -124,7 +124,7 @@ struct alignas(16) GPUSceneData {
     glm::vec4 sunlightDirection; // w for sun power
     glm::vec4 sunlightColor;
     glm::vec4 viewPos;
-    float     iTime;
+    glm::vec4 waterData;
 };
 
 struct ComputeContext {

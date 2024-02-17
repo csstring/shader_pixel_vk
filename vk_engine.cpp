@@ -19,6 +19,7 @@
 #include "Camera.hpp"
 #include "SDL_Event.hpp"
 #include "Cloud.hpp"
+glm::vec4 rottmp = glm::vec4(.0f);
 
 void VulkanEngine::init()
 {
@@ -429,12 +430,15 @@ void VulkanEngine::run()
 		ImGui_ImplSDL2_NewFrame(_window);
 
 		ImGui::NewFrame();
-
+// b.WaterTurbulence c.WaterAbsorption d.color
     ImGui::Begin("Scene controller");
   	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 		ImGui::Text("carmera pos x : %f y : %f z : %f", camera._cameraPos.x, camera._cameraPos.y, camera._cameraPos.z);
 		ImGui::SliderFloat3("light pos", &sceneData.sunlightDirection.x, -40, 40);
-		// ImGui::SliderFloat3("light pos", &sceneData.sunlightDirection.x, -40, 40);
+		ImGui::SliderFloat("WaterTurbulence", &sceneData.waterData.y, -20, 20);
+		ImGui::SliderFloat("WaterAbsorption", &sceneData.waterData.z, 0, 1);
+		ImGui::SliderFloat("water degree", &rottmp.w, -3.14, 3.14);
+		ImGui::SliderFloat3("water x y z", &rottmp.x, -1, 1);
 		ImGui::End();
 		_cloud->guiRender();
 		draw();
@@ -488,7 +492,7 @@ void VulkanEngine::draw()
 	//connect clear values
 	rpInfo.clearValueCount = 2;
 	rpInfo.pClearValues = clearValues;
-	_cloud->update(1.f/ 120.f);
+	// _cloud->update(1.f/ 120.f);
 	// cloudScene->update(1./120., _frameNumber % 2);
 	ImGui::Render();
 	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -1163,11 +1167,11 @@ void VulkanEngine::update_scene()
 	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(240.0f));
 	// loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
 	// }
-	glm::mat4 sandTransForm = glm::translate(glm::vec3(0, -50, -0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(40.0f));
-	glm::mat4 sprTransForm = glm::translate(glm::vec3(0, -40, 0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
+	glm::mat4 sandTransForm = glm::translate(glm::vec3(0, -0, -0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(100.0f));
+	glm::mat4 sprTransForm = glm::translate(glm::vec3(0, -0, 0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
 	// loadedScenes["skysphere"]->Draw(s, mainDrawContext);
 	// loadedScenes["cloudCube"]->Draw(_cloud->getModelMatrix(), mainDrawContext);
-	loadedScenes["sand"]->Draw(sandTransForm, mainDrawContext);
+	loadedScenes["sand"]->Draw(glm::rotate(glm::mat4(1.0f), rottmp.w, glm::vec3(rottmp)) * sandTransForm, mainDrawContext);
 	// loadedScenes["sphere"]->Draw(sprTransForm, mainDrawContext);
 	// switch (_portalManager.getPortalState())
 	// {
@@ -1187,8 +1191,7 @@ void VulkanEngine::update_scene()
 	// sceneData.viewPos = _camera._view * glm::vec4(_camera._cameraPos, 1.0f);
 	std::chrono::duration<float> elapsed = now - start;
 	sceneData.viewPos = glm::vec4(_camera._cameraPos,1);
-	sceneData.iTime = elapsed.count();
-	// std::cout << sceneData.iTime << std::endl; 
+	sceneData.waterData.x = elapsed.count();
 }
 
 void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)

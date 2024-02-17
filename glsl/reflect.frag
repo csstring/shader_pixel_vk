@@ -1,14 +1,7 @@
 #version 450
 
-layout(set = 1, binding = 3) uniform samplerCube skyBox;
-
-layout(set = 0, binding = 0) uniform  SceneData{   
-	vec4 ambientColor;
-	vec4 sunlightDirection; //w for sun power
-	vec4 sunlightColor;
-	vec4 viewPos;
-} sceneData;
-
+#extension GL_GOOGLE_include_directive : require
+#include "input_structures.glsl"
 
 layout (location = 0) in vec3 inPos;
 layout (location = 1) in vec3 inNormal;

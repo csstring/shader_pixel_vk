@@ -1,23 +1,7 @@
 #version 460
 
-// #extension GL_GOOGLE_include_directive : require
-// #include "input_structures.glsl"
-layout(set = 0, binding = 0) uniform  SceneData{   
-	vec4 ambientColor;
-	vec4 sunlightDirection; //w for sun power
-	vec4 sunlightColor;
-	vec4 viewPos;
-} sceneData;
-
-layout(set = 1, binding = 0) uniform GLTFMaterialData{   
-
-	vec4 colorFactors;
-	vec4 metal_rough_factors;
-	
-} materialData;
-
-layout(set = 1, binding = 1) uniform sampler2D colorTex;
-layout(set = 1, binding = 2) uniform sampler2D metalRoughTex;
+#extension GL_GOOGLE_include_directive : require
+#include "input_structures.glsl"
 
 layout (location = 0) in vec3 inNormal;
 layout (location = 1) in vec3 inColor;
