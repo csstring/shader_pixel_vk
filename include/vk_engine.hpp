@@ -22,6 +22,7 @@ struct GLTFMetallic_Roughness {
   MaterialPipeline reflectPipeline;
   MaterialPipeline stencilFillPipeline;
   MaterialPipeline cloudPipeline;
+  MaterialPipeline waterPipeline;
 	VkDescriptorSetLayout materialLayout;
 
 	struct MaterialConstants {

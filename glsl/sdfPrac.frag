@@ -1,6 +1,6 @@
 #version 460
 #define PERFORMANCE_MODE 0
-#define ULTRA_MODE 1 
+#define ULTRA_MODE 1
 // #define MAX_VOLUME_ENTRIES 1
 #if PERFORMANCE_MODE
 #define ALLOW_KEYBOARD_INPUT 0
@@ -8,7 +8,7 @@
 #define ADD_WHITE_WATER 0
 #define MAX_SDF_SPHERE_STEPS 12
 #define SDF_START_STEP_SIZE 3.0
-#define SDF_END_STEP_SIZE 150.0
+#define SDF_END_STEP_SIZE 100.0
 #define MAX_VOLUME_MARCH_STEPS 10
 #define BINARY_SEARCH_STEPS 5
 #define MAX_OPAQUE_SHADOW_MARCH_STEPS 4
@@ -25,7 +25,7 @@
 #define ADD_WHITE_WATER 1
 #define MAX_SDF_SPHERE_STEPS 20
 #define SDF_START_STEP_SIZE 1.5
-#define SDF_END_STEP_SIZE 150.0
+#define SDF_END_STEP_SIZE 100.0
 #define MAX_VOLUME_MARCH_STEPS 20
 #define BINARY_SEARCH_STEPS 6
 #define MAX_OPAQUE_SHADOW_MARCH_STEPS 10
@@ -33,7 +33,7 @@
 #endif
 
 #define GROUND_LEVEL 0.0
-#define WATER_LEVEL 10.0
+#define WATER_LEVEL 20.0
 #define PI 3.14
 #define LARGE_NUMBER 1e20
 #define EPSILON 0.0001
@@ -78,24 +78,19 @@ layout(set = 1, binding = 0) uniform GLTFMaterialData{
 	
 } materialData;
 
-layout(push_constant) uniform Params {
-    mat4 render_matrix;
-    mat4 view;
+layout( push_constant ) uniform constants
+{
+	mat4 render_matrix;
+	mat4 view;
 	mat4 proj;
-    vec4 uvwOffset;
-    vec4 lightDir;
-    vec4 lightColor;
-    float lightAbsorptionCoeff;
-    float densityAbsorption;
-    float aniso;
-    float dt;
 } PushConstants;
 
-layout(set = 1, binding = 1) uniform sampler2D colorTex;
-layout(set = 1, binding = 2) uniform sampler2D metalRoughTex;
+layout(set = 1, binding = 1) uniform sampler3D densityTex;
+layout(set = 1, binding = 2) uniform sampler3D lightingTex;
+layout(set = 1, binding = 3) uniform samplerCube skyBox;
 
 layout (location = 0) in vec3 inNormal;
-layout (location = 1) in vec3 inColor;
+layout (location = 1) in vec3 inModelPos;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) in vec3 inPos;
 layout (location = 4) in mat4 invModel;
@@ -238,15 +233,14 @@ float GetWaterNoise(vec3 position, float time)
 
 float QueryOceanDistanceField( in vec3 pos, float time)
 {    
-    // float tmp = GetWaterWavesDisplacement(pos, time) + GetWaterNoise(pos, time) + sdPlane(pos - vec3(0, WATER_LEVEL, 0));
     return pos.y - (GetWaterWavesDisplacement(pos, time) + GetWaterNoise(pos, time) + WATER_LEVEL);
 }
 
 float QueryVolumetricDistanceField( in vec3 pos, float time)
 {   
     float minDist = QueryOceanDistanceField(pos, time);
-    minDist = sdSmoothSubtraction(sdSphere(pos, vec3(0.0, 0.0, 0), 25.0) +  5.0 * fbm_4(pos / vec3(12, 20, 12)  - time / 5.0), minDist, 12.0);   
-    // minDist = sdSmoothUnion(minDist, sdPlane(pos - vec3(0, GROUND_LEVEL - 1.0, 0)), 13.0);
+    minDist = sdSmoothSubtraction(sdSphere(pos, sceneData.viewPos.xyz, 35.0) +  5.0 * fbm_4(pos / vec3(12, 20, 12)  - time / 5.0), minDist, 12.0);   
+    minDist = sdSmoothUnion(minDist, sdPlane(pos - vec3(0, GROUND_LEVEL - 1.0, 0)), 13.0);
 
     return minDist;
 }
@@ -267,7 +261,6 @@ float IntersectVolumetric(in vec3 rayOrigin, in vec3 rayDirection, float maxT, f
         if( sdfValue < 0.0 || t>maxT ) break;
         t += max(sdfValue, stepSize);
     }
-    
     if(sdfValue < 0.0f)
     {
         float start = 0.0;
@@ -296,7 +289,7 @@ float IntersectVolumetric(in vec3 rayOrigin, in vec3 rayDirection, float maxT, f
         t += end;
     }
     
-    intersectFound = t<maxT && sdfValue < 0.0;
+    intersectFound = t<maxT && sdfValue < 0.0f;
     return t;
 }
 
@@ -440,12 +433,8 @@ float IntersectOpaqueScene(in vec3 rayOrigin, in vec3 rayDirection, out int obje
         PlaneIntersection(rayOrigin, rayDirection, vec3(0, GROUND_LEVEL, 0), vec3(0, 1, 0)),
         SAND_FLOOR_OBJECT_ID,
         objectID);
-    
-    // UpdateIfIntersected(
-    //     t,
-    //     PlaneIntersection(rayOrigin, rayDirection, vec3(0, WATER_LEVEL + MAX_WATER_DISPLACEMENT, 0), vec3(0, 1, 0)),
-    //     INVALID_OBJECT_ID,
-    //     objectID);
+    if (t > sceneData.waterData.w)
+        t = LARGE_NUMBER;
 //  충돌 체크는 되는데 계속 마지막 물 히트에 걸리네?
 
     return t;
@@ -560,7 +549,8 @@ vec3 GetSunLightDirection()
 
 vec3 GetSunLightColor()
 {
-    return 0.9 * vec3(0.9, 0.75, 0.7);
+    return .9 * vec3(0.9, 0.75, 0.7);
+    // return 0.9 * vec3(0.9, 0.5, 0.4);
 }
 
 vec3 GetBaseSkyColor(vec3 rayDirection)
@@ -588,6 +578,57 @@ float GetCloudDenity(vec3 position)
     float noise = fbm_4(noisePosition);
     float noiseCutoff = -0.3;
     return max(0.0, 3.0f * (noise - noiseCutoff));
+}
+
+float HenyeyGreensteinPhase(vec3 L, vec3 V, float aniso) {
+    float cosTheta = dot(L, -V);
+    float g = aniso;
+    return (1.0 - g * g) / (4.0 * 3.141592 * pow(abs(1.0 + g * g - 2.0 * g * cosTheta), 1.5));
+}
+
+float BeerLambert1(float absorptionCoefficient, float distanceTraveled) {
+    return exp(-absorptionCoefficient * distanceTraveled);
+}
+
+vec3 GetUVW(vec3 posModel) {
+    return (posModel + 1.0) * 0.5;
+}
+
+vec4 CloudColor(vec3 dir)
+{
+    int numSteps = 16;
+    float stepSize = 1 / float(numSteps);
+    vec3 volumeAlbedo = vec3(1, 1, 1);
+    vec4 color = vec4(0, 0, 0, 1);
+    vec3 marchPosition = vec3(0.0f);
+    float cloudAbsorption = 0.7;//fix
+    for (int i =0; i < numSteps; ++i)
+    {
+        vec3 uvw = GetUVW(marchPosition);
+        float density = texture(densityTex, uvw).r;
+        float lighting = texture(lightingTex, uvw).r;
+
+        if (density > 1e-3){
+            float prevAlpha = color.a;
+            color.a *= BeerLambert1(cloudAbsorption * density, stepSize);
+            float absorptionFromMarch = prevAlpha - color.a;
+
+            // color.rgb += absorptionFromMarch * volumeAlbedo * GetSunLightColor() * density * lighting;
+                        //  * HenyeyGreensteinPhase(PushConstants.lightDir.xyz, dirModel, PushConstants.aniso);
+        }
+
+        marchPosition += dir*stepSize;
+        if (abs(marchPosition.x) > 1 || abs(marchPosition.y) > 1 || abs(marchPosition.z) > 1)
+            break;
+
+        if (color.a < 1e-3)
+            break;
+    }
+    color = clamp(color, 0.0, 1.0);
+    color.a = 1.0 - color.a;
+    // return color;
+    // if (inModelPos.z > -0.7) color.a = 0; 
+    return vec4(volumeAlbedo * (mix(GetAmbientShadowColor(), 10.3*GetSunLightColor(), vec3(color.a)) + GetAmbientSkyColor()), min(color.a, 1.0f));
 }
 
 vec4 GetCloudColor(vec3 position)
@@ -619,10 +660,11 @@ vec4 GetCloudColor(vec3 position)
 vec3 GetSkyColor(in vec3 rayDirection)
 {
     vec3 skyColor = GetBaseSkyColor(rayDirection);
-    vec4 cloudColor = GetCloudColor(rayDirection * 4.0);
+    // vec4 cloudColor = GetCloudColor(rayDirection*4.0f );
+    vec4 cloudColor = CloudColor(rayDirection );
     skyColor = mix(skyColor, cloudColor.rgb, cloudColor.a);
 
-    return skyColor;
+    return cloudColor.xyz;
 }
 
 float FresnelFactor(
@@ -726,10 +768,8 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
 {
     vec3 accumulatedColor = vec3(0.0f);
     vec3 accumulatedColorMultiplier = vec3(1.0);
-    
     int materialID = INVALID_OBJECT_ID;
     float t = IntersectOpaqueScene(rayOrigin, rayDirection, materialID);
-    // if (t == LARGE_NUMBER) return vec3(1.0f);
     vec3 opaquePosition = rayOrigin + t*rayDirection;
     
     bool outsideVolume = true;
@@ -748,8 +788,9 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
                 sceneData.waterData.x,
                 (firstEntry ? SCENE_TYPE_OCEAN : SCENE_TYPE_SIMPLIFIED_OCEAN),
                 intersectFound);
-    
-        if(!intersectFound) break;
+        // if (!intersectFound && t == LARGE_NUMBER) discard;
+        if(!intersectFound && entry == 0 && t == LARGE_NUMBER) return GetSkyColor(rayDirection);
+        if (!intersectFound) break;
 		else
         {
             outsideVolume = false;
@@ -1042,9 +1083,9 @@ void main()
     
     // float3 ray = -normalize(eyeWorld - input.posWorld);
     vec3 rayOrigin = sceneData.viewPos.xyz;
-    vec3 rayDirection = (inPos - rayOrigin);
+    vec3 rayDirection = normalize(inPos - rayOrigin);
     // rayDirection.y *= -1;
-    vec3 color = Render(rayOrigin, normalize(rayDirection));
+    vec3 color = Render(rayOrigin, rayDirection);
     outFragColor=vec4(GammaCorrect(color), 1.0 );
 }
 
