@@ -121,8 +121,8 @@ struct RenderObject {
 
 struct alignas(16) GPUSceneData {
     glm::vec4 ambientColor;
-    glm::vec4 sunlightDirection; // w for sun power
-    glm::vec4 sunlightColor;
+    glm::vec4 sunlightDirection; 
+    glm::vec4 sunlightColor;// w for sun power
     glm::vec4 viewPos;
     glm::vec4 waterData;
 };

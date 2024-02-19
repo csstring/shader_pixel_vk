@@ -39,9 +39,9 @@ void CloudScene::initialize(VulkanEngine* engine)
 	// imageWidth = 128;
   // imageHeight = 128;
   // imageDepth = 128;
-	imageWidth = 128*4;
-  imageHeight = 128/8;
-  imageDepth = 128*4;
+	imageWidth = 128;
+  imageHeight = 128;
+  imageDepth = 128;
 	// imageWidth = 128*4;
   // imageHeight = 128*4;
   // imageDepth = 128/8;

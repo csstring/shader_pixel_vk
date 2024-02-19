@@ -434,14 +434,16 @@ void VulkanEngine::run()
     ImGui::Begin("Scene controller");
   	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 		ImGui::Text("carmera pos x : %f y : %f z : %f", camera._cameraPos.x, camera._cameraPos.y, camera._cameraPos.z);
-		ImGui::SliderFloat3("light pos", &sceneData.sunlightDirection.x, -40, 40);
+		ImGui::SliderFloat3("light pos", &sceneData.sunlightDirection.x, -1, 1);
+		ImGui::SliderFloat3("light color", &sceneData.sunlightColor.x, 0, 1);
+		ImGui::SliderFloat("light power", &sceneData.sunlightColor.w, 0, 100);
 		ImGui::SliderFloat("WaterTurbulence", &sceneData.waterData.y, -20, 20);
 		ImGui::SliderFloat("WaterAbsorption", &sceneData.waterData.z, 0, 1);
 		ImGui::SliderFloat("Waterdistance", &sceneData.waterData.w, 0, 250);
 		ImGui::SliderFloat("water degree", &rottmp.w, -3.14, 3.14);
 		ImGui::SliderFloat3("water x y z", &rottmp.x, -1, 1);
 		ImGui::End();
-		_cloud->guiRender();
+		// _cloud->guiRender();
 		draw();
 	}
 }
