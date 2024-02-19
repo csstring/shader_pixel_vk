@@ -4,154 +4,169 @@
 #include "vk_initializers.hpp"
 #include "Camera.hpp"
 #include "imgui.h"
-#include <glm/gtx/transform.hpp>
 //더블 이미지쓰지 말고 하나로 일단 해보자
 
 void CloudScene::guiRender()
 {
   ImGui::Begin("Scene controller");
-	ImGui::SliderFloat("lightAbsorptionCoeff", &constants.lightAbsorptionCoeff, 0, 20);
+	ImGui::SliderFloat("lightAbsorptionCoeff", &constants.lightAbsorptionCoeff, 0, 100);
 	ImGui::SliderFloat("densityAbsorption", &constants.densityAbsorption, 0, 100);
 	ImGui::SliderFloat("aniso", &constants.aniso, 0, 2);
-	ImGui::SliderFloat3("lightDir", &constants.lightDir.x, -4, 4);
+	ImGui::SliderFloat3("lightDir", &constants.lightDir.x, -1, 1);
 	ImGui::SliderFloat3("lightColor", &constants.lightColor.x, 0, 255);
 	ImGui::SliderFloat3("uvwOffset", &constants.uvwOffset.x, 0, 100);
-	ImGui::SliderFloat3("model translate", &modelTrans.x, -50, 50);
+	ImGui::SliderFloat3("model translate", &modelTrans.x, -400, 400);
+	ImGui::SliderFloat3("model scale", &modelscale.x, 0, 200);
+	ImGui::SliderFloat3("rot xyz", &rot.x, -1, 1);
+	ImGui::SliderFloat("rot degree", &rot.w, -3.14, 3.14);
 	ImGui::End();
-	// _engine->_renderables.front().transformMatrix = glm::translate(modelTrans) *  glm::scale(glm::vec3{60,60,60});
 }
 
 void CloudScene::initialize(VulkanEngine* engine)
 {
   _engine = engine;
-	constants.lightAbsorptionCoeff = 5.0;
+	constants.lightAbsorptionCoeff = 20.0;
 	constants.lightDir = glm::vec4(0,1,0,0);
-	constants.densityAbsorption = 10.0;
-	constants.lightColor = glm::vec4(1.0f) * 40.0f;
+	constants.densityAbsorption = 60.0;
+	constants.lightColor = glm::vec4(1.0f) * 10.0f;
 	constants.aniso = 0.3;
-	constants.uvwOffset = glm::vec4(1.0f,1.0f,1.0f, 0.0f);
-	constants.dt = 1.0f/120.0f;
-
+	// constants.uvwOffset = glm::vec4(0.f,0.f,0.f, 0.0f);
+	constants.uvwOffset = glm::vec4(1.0f);
+	constants.dt = 1.0f/ 720.0f;
+	modelTrans = glm::vec3(0,70,-0);
+	rot = glm::vec4(1,0,0, 3.14 / 2.0f);
+	modelscale = glm::vec3(250, 250, 35);
+	// imageWidth = 128;
+  // imageHeight = 128;
+  // imageDepth = 128;
+	imageWidth = 128;
+  imageHeight = 128;
+  imageDepth = 128;
+	// imageWidth = 128*4;
+  // imageHeight = 128*4;
+  // imageDepth = 128/8;
+	// imageWidth = 128/4;
+  // imageHeight = 128*4;
+  // imageDepth = 128*4;
   init_commands();
   init_sync_structures();
   init_image_buffer();
-  uploadCubeMesh();
-  initRenderPipelines();
   initGenCloudPipelines();
   initMakeLightTexturePipelines();
+
 }
 
 void CloudScene::initRenderPipelines()
 {
-	VkDescriptorSetLayout descriptorSetLayout;
-  VkDescriptorSet descriptorSetFirst, descriptorSetSecond;
-	//init descriptor
-	{
-		DescriptorLayoutBuilder builder;
-    builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-		builder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    descriptorSetLayout = builder.build(_engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
-	}
-	descriptorSetFirst = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
-	descriptorSetSecond = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
+	// VkDescriptorSetLayout descriptorSetLayout;
+  // VkDescriptorSet descriptorSetFirst, descriptorSetSecond;
+	// //init descriptor
+	// {
+	// 	DescriptorLayoutBuilder builder;
+  //   builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	// 	builder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  //   descriptorSetLayout = builder.build(_engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	// }
+	// descriptorSetFirst = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
+	// descriptorSetSecond = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
 		
-	{
-    DescriptorWriter writer;	
-		writer.write_image(0, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-		writer.write_image(1, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.update_set(_engine->_device, descriptorSetFirst);
-  }
+	// {
+  //   DescriptorWriter writer;	
+	// 	writer.write_image(0, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	// 	writer.write_image(1, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  //   writer.update_set(_engine->_device, descriptorSetFirst);
+  // }
 
-	{
-    DescriptorWriter writer;	
-		writer.write_image(0, _cloudImageBuffer[1][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-		writer.write_image(1, _cloudImageBuffer[1][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.update_set(_engine->_device, descriptorSetSecond);
-  }
-	_deletionQueue.push_function([=]() {
-        vkDestroyDescriptorSetLayout(_engine->_device, descriptorSetLayout, nullptr);
-  });
-	//init pipeline
-	{
-	PipelineBuilder pipelineBuilder;
-  pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
-  pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info();
-	//input assembly is the configuration for drawing triangle lists, strips, or individual points.
-	//we are just going to draw triangle list
-	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	//build viewport and scissor from the swapchain extents
-	pipelineBuilder._viewport.x = 0.0f;
-	pipelineBuilder._viewport.y = 0.0f;
-	pipelineBuilder._viewport.width = (float)_engine->_windowExtent.width;
-	pipelineBuilder._viewport.height = (float)_engine->_windowExtent.height;
-	pipelineBuilder._viewport.minDepth = 0.0f;
-	pipelineBuilder._viewport.maxDepth = 1.0f;
+	// {
+  //   DescriptorWriter writer;	
+	// 	writer.write_image(0, _cloudImageBuffer[1][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	// 	writer.write_image(1, _cloudImageBuffer[1][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  //   writer.update_set(_engine->_device, descriptorSetSecond);
+  // }
+	// _deletionQueue.push_function([=]() {
+  //       vkDestroyDescriptorSetLayout(_engine->_device, descriptorSetLayout, nullptr);
+  // });
+	// //init pipeline
+	// {
+	// PipelineBuilder pipelineBuilder;
+  // pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+  // pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info();
+	// //input assembly is the configuration for drawing triangle lists, strips, or individual points.
+	// //we are just going to draw triangle list
+	// pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	// //build viewport and scissor from the swapchain extents
+	// pipelineBuilder._viewport.x = 0.0f;
+	// pipelineBuilder._viewport.y = 0.0f;
+	// pipelineBuilder._viewport.width = (float)_engine->_windowExtent.width;
+	// pipelineBuilder._viewport.height = (float)_engine->_windowExtent.height;
+	// pipelineBuilder._viewport.minDepth = 0.0f;
+	// pipelineBuilder._viewport.maxDepth = 1.0f;
 
-	pipelineBuilder._scissor.offset = { 0, 0 };
-	pipelineBuilder._scissor.extent = _engine->_windowExtent;
+	// pipelineBuilder._scissor.offset = { 0, 0 };
+	// pipelineBuilder._scissor.extent = _engine->_windowExtent;
 
-	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
-	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info();
-	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state();
+	// pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL);
+	// pipelineBuilder._multisampling = vkinit::multisampling_state_create_info();
+	// pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state();
 
-  VkPipelineLayoutCreateInfo textured_pipeline_layout_info = vkinit::pipeline_layout_create_info();
+  // VkPipelineLayoutCreateInfo textured_pipeline_layout_info = vkinit::pipeline_layout_create_info();
 
-	VkDescriptorSetLayout texturedSetLayouts[] = {_engine->_gpuSceneDataDescriptorLayout, descriptorSetLayout };//fix me
-  VkPushConstantRange push_constant;
-	push_constant.offset = 0;
-	push_constant.size = sizeof(CloudPushConstants);
-	push_constant.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
-	textured_pipeline_layout_info.pPushConstantRanges = &push_constant;
-	textured_pipeline_layout_info.pushConstantRangeCount = 1;
+	// VkDescriptorSetLayout texturedSetLayouts[] = {_engine->_gpuSceneDataDescriptorLayout, descriptorSetLayout };//fix me
+  // VkPushConstantRange push_constant;
+	// push_constant.offset = 0;
+	// push_constant.size = sizeof(CloudPushConstants);
+	// push_constant.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
+	// textured_pipeline_layout_info.pPushConstantRanges = &push_constant;
+	// textured_pipeline_layout_info.pushConstantRangeCount = 1;
 
-	textured_pipeline_layout_info.setLayoutCount = 3;//fix me
-	textured_pipeline_layout_info.pSetLayouts = texturedSetLayouts;
-	VkPipelineLayout texturedPipeLayout;
-	VK_CHECK(vkCreatePipelineLayout(_engine->_device, &textured_pipeline_layout_info, nullptr, &texturedPipeLayout));
+	// textured_pipeline_layout_info.setLayoutCount = 3;//fix me
+	// textured_pipeline_layout_info.pSetLayouts = texturedSetLayouts;
+	// VkPipelineLayout texturedPipeLayout;
+	// VK_CHECK(vkCreatePipelineLayout(_engine->_device, &textured_pipeline_layout_info, nullptr, &texturedPipeLayout));
 	
-	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
-	pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions = vertexDescription.attributes.data();
-	pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = vertexDescription.attributes.size();
+	// VertexInputDescription vertexDescription = Vertex::get_vertex_description();
+	// pipelineBuilder._vertexInputInfo.pVertexAttributeDescriptions = vertexDescription.attributes.data();
+	// pipelineBuilder._vertexInputInfo.vertexAttributeDescriptionCount = vertexDescription.attributes.size();
 
-	pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
-	pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
+	// pipelineBuilder._vertexInputInfo.pVertexBindingDescriptions = vertexDescription.bindings.data();
+	// pipelineBuilder._vertexInputInfo.vertexBindingDescriptionCount = vertexDescription.bindings.size();
 
-  VkShaderModule fragmentShader;
-  VkShaderModule vertShader;
+  // VkShaderModule fragmentShader;
+  // VkShaderModule vertShader;
 
-	if (!vkutil::load_shader_module("./spv/cloud.vert.spv", _engine->_device, &vertShader)){
-		std::cout << "Error when building the triangle vertex shader module" << std::endl;
-	}
-	else {
-		std::cout << "Red Triangle vertex shader successfully loaded" << std::endl;
-	}
+	// if (!vkutil::load_shader_module("./spv/cloud.vert.spv", _engine->_device, &vertShader)){
+	// 	std::cout << "Error when building the triangle vertex shader module" << std::endl;
+	// }
+	// else {
+	// 	std::cout << "Red Triangle vertex shader successfully loaded" << std::endl;
+	// }
 
-	if (!vkutil::load_shader_module("./spv/cloud.frag.spv", _engine->_device, &fragmentShader))
-	{
-		std::cout << "Error when building the default_lit fragment shader module" << std::endl;
-	}
-	else {
-		std::cout << "Red Triangle default_lit shader successfully loaded" << std::endl;
-	}
+	// if (!vkutil::load_shader_module("./spv/cloud.frag.spv", _engine->_device, &fragmentShader))
+	// {
+	// 	std::cout << "Error when building the default_lit fragment shader module" << std::endl;
+	// }
+	// else {
+	// 	std::cout << "Red Triangle default_lit shader successfully loaded" << std::endl;
+	// }
 
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertShader));
-	pipelineBuilder._shaderStages.push_back(
-		vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
-	pipelineBuilder._pipelineLayout = texturedPipeLayout;
-	VkPipeline texPipeline = pipelineBuilder.build_pipeline(_engine->_device, _engine->_renderPass);
-  //일단 한개만 
-	_engine->create_material(texPipeline, texturedPipeLayout, "cloudRenderPipe", 1, descriptorSetFirst, 
-	sizeof(CloudPushConstants), (void*)&constants);
+	// pipelineBuilder._shaderStages.push_back(
+	// 	vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertShader));
+	// pipelineBuilder._shaderStages.push_back(
+	// 	vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
+	// pipelineBuilder._pipelineLayout = texturedPipeLayout;
+	// VkPipeline texPipeline = pipelineBuilder.build_pipeline(_engine->_device, _engine->_renderPass);
+  // //일단 한개만 
+	// _engine->create_material(texPipeline, texturedPipeLayout, "cloudRenderPipe", 1, descriptorSetFirst, 
+	// sizeof(CloudPushConstants), (void*)&constants);
 
-	vkDestroyShaderModule(_engine->_device, fragmentShader, nullptr);
-  vkDestroyShaderModule(_engine->_device, vertShader, nullptr);
+	// vkDestroyShaderModule(_engine->_device, fragmentShader, nullptr);
+  // vkDestroyShaderModule(_engine->_device, vertShader, nullptr);
 
- 	_deletionQueue.push_function([=]() {
-		vkDestroyPipeline(_engine->_device, texPipeline, nullptr);
-		vkDestroyPipelineLayout(_engine->_device, texturedPipeLayout, nullptr);
-  });
-	}
+ 	// _deletionQueue.push_function([=]() {
+	// 	vkDestroyPipeline(_engine->_device, texPipeline, nullptr);
+	// 	vkDestroyPipelineLayout(_engine->_device, texturedPipeLayout, nullptr);
+  // });
+	// }
 }
 
 void CloudScene::initGenCloudPipelines()
@@ -192,7 +207,7 @@ void CloudScene::initGenCloudPipelines()
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = SetLayouts;
-  std::cerr << sizeof(CloudPushConstants) << std::endl;
+
 	VkPushConstantRange push_constant;
 	push_constant.offset = 0;
 	push_constant.size = sizeof(CloudPushConstants);
@@ -292,9 +307,6 @@ void CloudScene::initMakeLightTexturePipelines()
 
 void CloudScene::init_pipelines()
 {
-  initRenderPipelines();
-  initGenCloudPipelines();
-  initMakeLightTexturePipelines();
 }
 
 void CloudScene::uploadCubeMesh()
@@ -417,7 +429,6 @@ void CloudScene::makeLightTexture()
 {
   Material* computMaterial = _engine->get_material("MAKELIGHTTEXTURE");
 	VkCommandBuffer cmd = _engine->get_current_frame()._mainCommandBuffer;
-
   vkCmdPushConstants(cmd, computMaterial->pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CloudPushConstants), &constants);
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computMaterial->pipeline);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computMaterial->pipelineLayout, 0, 1, &computMaterial->textureSet, 0, nullptr);
@@ -435,33 +446,83 @@ void CloudScene::genCloud()
   vkCmdDispatch(cmd, imageWidth/dispatchSize, imageHeight/dispatchSize, imageDepth / dispatchSize);
 }
 
-void CloudScene::update(float dt, uint32_t frameidx)
+void CloudScene::update(float dt)
 {
-	_curFrameIdx = frameidx;
-	guiRender();
 	Camera cam = Camera::getInstance();
 	static int color = 0;
-	static float beforeX = cam._lastX * imageWidth / _engine->_windowExtent.width;
-  static float beforeY = cam._lastY * imageHeight / _engine->_windowExtent.height;
-
-	float curX = cam._lastX * imageWidth / _engine->_windowExtent.width;
-	float curY = cam._lastY * imageHeight / _engine->_windowExtent.height;
-
-	beforeX = curX;
-	beforeY = curY;
-
-	constants.camPos = glm::vec4(cam._cameraPos,1.0f);
-	constants.cursorPos = glm::vec4(curX, curY, 0.f,0.f);
 	constants.uvwOffset += glm::vec4(constants.dt/4.0f, 0.,constants.dt/4.0f,0.);
-	if (cam._clickOn == true){
-		constants.cursorPos.w = 1.0f;
+	if (color++ == 0){
 	}
-
-	makeLightTexture();
   genCloud();
-
+	makeLightTexture();
 }
 
 void CloudScene::draw(VkCommandBuffer cmd)
 {
 }
+/*
+User
+You
+AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
+{
+	size_t data_size = size.depth * size.width * size.height * 4;
+	AllocatedBuffer uploadbuffer = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	AllocatedBuffer readbackBuffer = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_TO_CPU);
+
+	memcpy(uploadbuffer.info.pMappedData, data, data_size);
+	
+	AllocatedImage new_image = create_image(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
+
+	immediate_submit([&](VkCommandBuffer cmd) {
+		vkutil::transitionImageLayout(cmd, new_image._image, new_image._imageFormat,VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+		VkBufferImageCopy copyRegion = {};
+		copyRegion.bufferOffset = 0;
+		copyRegion.bufferRowLength = 0;
+		copyRegion.bufferImageHeight = 0;
+
+		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.imageSubresource.mipLevel = 0;
+		copyRegion.imageSubresource.baseArrayLayer = 0;
+		copyRegion.imageSubresource.layerCount = 1;
+		copyRegion.imageExtent = size;
+		copyRegion.imageOffset = {0, 0, 0};
+		// copy the buffer into the image
+		vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image._image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+			&copyRegion);
+
+		vkutil::transitionImageLayout(cmd, new_image._image,new_image._imageFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+			vkutil::transitionImageLayout(cmd, new_image._image, new_image._imageFormat,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0; // Tightly packed
+    region.bufferImageHeight = 0; // Tightly packed
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageExtent = size;
+
+    vkCmdCopyImageToBuffer(cmd, new_image._image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readbackBuffer.buffer, 1, &region);
+
+    // Transition back if necessary
+    vkutil::transitionImageLayout(cmd, new_image._image, new_image._imageFormat,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		});
+	std::cerr << *(uint32_t*)uploadbuffer.info.pMappedData << std::endl;
+	destroy_buffer(uploadbuffer);
+	void* mappedData;
+	vmaMapMemory(_allocator, readbackBuffer.allocation, &mappedData);
+	// Assuming the image format is VK_FORMAT_R8G8B8A8_UNORM and you're reading the entire image
+	uint32_t* pixels = static_cast<uint32_t*>(mappedData);
+	for (size_t i = 0; i < size.width * size.height; ++i) {
+			std::cout << std::hex << pixels[i] << " ";
+			if ((i + 1) % size.width == 0) std::cout << std::endl; // New line per image row
+	}
+	vmaUnmapMemory(_allocator, readbackBuffer.allocation);
+	destroy_buffer(readbackBuffer);
+	return new_image;
+}*/

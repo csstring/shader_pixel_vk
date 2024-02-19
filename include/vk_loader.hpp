@@ -63,5 +63,6 @@ private:
 //forward declaration
 class VulkanEngine;
 std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath);
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string dirPath, std::string fileName);
-void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format);
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string dirPath, std::string fileName, MaterialPass passType, glm::mat4 transfrom = glm::mat4(1.0f));
+void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format, VkSampler* sampler, AllocatedImage* newImage);
+void loadKtxTexture(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format, AllocatedImage* newImage);

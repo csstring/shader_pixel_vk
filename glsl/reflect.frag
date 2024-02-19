@@ -1,18 +1,7 @@
 #version 450
 
-layout(set = 1, binding = 1) uniform samplerCube samplerCubeMap;
-layout(set = 1, binding = 2) uniform sampler2D metalRoughTex;
-
-layout(set = 0, binding = 0) uniform  SceneData{   
-
-	mat4 view;
-	mat4 proj;
-	mat4 viewproj;
-	vec4 ambientColor;
-	vec4 sunlightDirection; //w for sun power
-	vec4 sunlightColor;
-	vec4 viewPos;
-} sceneData;
+#extension GL_GOOGLE_include_directive : require
+#include "input_structures.glsl"
 
 layout (location = 0) in vec3 inPos;
 layout (location = 1) in vec3 inNormal;
@@ -25,14 +14,14 @@ layout (location = 0) out vec4 outFragColor;
 void main()
 {
 	vec3 cI = normalize (inPos);
-	vec3 cR = reflect (cI, normalize(inNormal));
+	vec3 cR = reflect (-cI, normalize(inNormal));
 
 	cR = vec3(invModel * vec4(cR, 0.0));
 	// Convert cubemap coordinates into Vulkan coordinate space
 	cR.xy *= -1.0;
 
-	vec4 color = texture(samplerCubeMap, cR, 0);
-
+	vec4 color = texture(skyBox, cR, 0);
+	// outFragColor= color;
 	vec3 N = normalize(inNormal);
 	vec3 L = normalize(inLightVec);
 	vec3 V = normalize(inViewVec);

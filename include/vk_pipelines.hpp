@@ -6,9 +6,11 @@ namespace vkutil{
 }
 
 class PipelineBuilder {
-  
-  public:
+  private:
     std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;
+    std::vector<VkShaderModule> _shaders;
+    
+  public:
     VkPipelineInputAssemblyStateCreateInfo _inputAssembly;
     VkPipelineRasterizationStateCreateInfo _rasterizer;
     VkPipelineColorBlendAttachmentState _colorBlendAttachment;
@@ -19,6 +21,7 @@ class PipelineBuilder {
     VkViewport _viewport;
     VkRect2D _scissor;
     VkPipeline build_pipeline(VkDevice device, VkRenderPass pass);
-
+    void loadShader(std::string ShaderPath, VkDevice device, VkShaderStageFlagBits shaderStage);
+    void shaderFlush(VkDevice device);
 };
 

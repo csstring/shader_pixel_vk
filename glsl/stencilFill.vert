@@ -8,9 +8,6 @@ layout (location = 3) in vec3 inColor;
 #extension GL_GOOGLE_include_directive : require
 #include "input_structures.glsl"
 
-
-layout (location = 0) out vec3 outUVW;
-
 layout( push_constant ) uniform constants
 {
 	mat4 render_matrix;
@@ -18,10 +15,8 @@ layout( push_constant ) uniform constants
 	mat4 proj;
 } PushConstants;
 
+
 void main() 
 {
-  outUVW = inPos;
-  outUVW.xy *= -1.0;
-  mat4 viewMat = mat4(mat3(PushConstants.render_matrix));
-	gl_Position = PushConstants.proj * PushConstants.view * viewMat * vec4(inPos, 1.0f);
+	gl_Position = PushConstants.proj * PushConstants.view * PushConstants.render_matrix * vec4(inPos, 1.0f);
 }

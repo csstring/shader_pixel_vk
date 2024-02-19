@@ -34,11 +34,11 @@ void Camera::initialize(void)
     _isFirst = true;
     _isOn = false;
     _clickOn = false;
-    _cameraPos = glm::vec3(0, 0 ,-2.0);
+    _cameraPos = glm::vec3(0, 40 ,2.0);
     _cameraUp = glm::vec3(0,1,0);
-    _cameraFront = glm::vec3(0,0,1);
+    _cameraFront = glm::vec3(0,-1,0.);
     _worldUp = _cameraUp;
-    _zFar = 50;
+    _zFar = 500;
     _moveDir = CAMERA_MOVE_DIR::MOVE_STOP;
     projection = glm::perspective(glm::radians(_fov), 1920.f / 1080.f, _zNear, _zFar);
     updateCameraVectors(); 
@@ -111,4 +111,15 @@ glm::vec4 Camera::getWorldCursorPos(float width, float height) const
     const float x = _lastX / ratio - midlePlaneX / 2.0f;
 
     return glm::vec4(_cameraPos + _cameraFront * distance + _cameraRight * x + _cameraUp * y, 1.0f);
+}
+
+glm::mat4 Camera::getMirrorView(glm::vec3 mirrorNormal,glm::vec3 mirrorPoint)
+{
+    glm::vec3 toMirror = _cameraPos - mirrorPoint;
+    glm::vec3 reflectedVector = glm::reflect(toMirror, mirrorNormal);
+    glm::vec3 reflectedPosition = mirrorPoint + reflectedVector;
+    glm::vec3 reflectedFront = glm::reflect(_cameraFront, mirrorNormal);    
+    glm::vec3 reflectedTarget = reflectedPosition + reflectedFront;
+    glm::mat4 reflectedView = glm::lookAt(reflectedPosition, reflectedTarget, _cameraUp);
+    return reflectedView;
 }

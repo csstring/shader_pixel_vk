@@ -7,6 +7,8 @@
 #include "vk_loader.hpp"  
 #include "ktx.h"
 #include "ktxvulkan.h"
+#include "Portal.hpp"
+#include "Cloud.hpp"
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 class CloudScene;
@@ -14,9 +16,13 @@ class CloudScene;
 struct GLTFMetallic_Roughness {
 	MaterialPipeline opaquePipeline;
 	MaterialPipeline transparentPipeline;
-  MaterialPipeline skyBoxPipeline;
-  MaterialPipeline reflectPipeline;
+  MaterialPipeline world_INskyBoxPipeline;
+  MaterialPipeline world_OutSkyBoxPipeline;
 
+  MaterialPipeline reflectPipeline;
+  MaterialPipeline stencilFillPipeline;
+  MaterialPipeline cloudPipeline;
+  MaterialPipeline waterPipeline;
 	VkDescriptorSetLayout materialLayout;
 
 	struct MaterialConstants {
@@ -31,16 +37,20 @@ struct GLTFMetallic_Roughness {
 		VkSampler colorSampler;
 		AllocatedImage metalRoughImage;
 		VkSampler metalRoughSampler;
+    AllocatedImage skyBoxImage;
+		VkSampler skyBoxSampler;
 		VkBuffer dataBuffer;
 		uint32_t dataBufferOffset;
 	};
 
 	void build_pipelines(VulkanEngine* engine);
-  void buildSkyBoxpipelines(VulkanEngine* engine);
+  void buildWorldSkyBoxpipelines(VulkanEngine* engine);
+  void buildstencilFillpipelines(VulkanEngine* engine);
+  void build_cloudPipelines(VulkanEngine* engine);
   // void buildReflectpipelines(VulkanEngine* engine);
   
   DescriptorWriter writer;
-	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+	MaterialInstance write_material(VulkanEngine* engine, MaterialPass pass, MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 };
 
 struct MeshNode : public Node {
@@ -102,7 +112,7 @@ class VulkanEngine
     Material* get_material(const std::string& name);
     AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
-    AllocatedImage createCubeImage(ktxTexture* ktxTexture, VkFormat format);
+    AllocatedImage createCubeImage(ktxTexture* ktxTexture, VkFormat format, VkSampler* sampler);
     Mesh* get_mesh(const std::string& name);
     size_t pad_uniform_buffer_size(size_t originalSize);
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
@@ -161,12 +171,19 @@ class VulkanEngine
     AllocatedImage _blackImage;
     AllocatedImage _greyImage;
     AllocatedImage _errorCheckerboardImage;
-    AllocatedImage _skyBoxImage;
+    AllocatedImage _vulkanBoxImage;
+    AllocatedImage _spaceBoxImage;
+    AllocatedImage _skySphereImage;
+
     VkSampler _defaultSamplerLinear;
 	  VkSampler _defaultSamplerNearest;
-    VkSampler _skyBoxSamplerLinear;
+    VkSampler _vulkanBoxSamplerLinear;
+    VkSampler _spaceBoxSamplerLinear;
 
     DrawContext mainDrawContext;
     std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
     std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
+
+    Portal _portalManager;
+    CloudScene* _cloud;
 };

@@ -42,6 +42,25 @@ bool vkutil::load_shader_module(const char* filePath,
     return true;
 }
 
+void PipelineBuilder::loadShader(std::string ShaderPath, VkDevice device, VkShaderStageFlagBits shaderStage)
+{
+    VkShaderModule shaderModule;
+    if (!vkutil::load_shader_module(ShaderPath.c_str(), device, &shaderModule)) {
+		std::cerr << "Error when building the skybox vertex shader module" << std::endl;
+	}
+    _shaderStages.push_back(
+		vkinit::pipeline_shader_stage_create_info(shaderStage, shaderModule));
+    _shaders.push_back(_shaderStages.back().module);
+}
+
+void PipelineBuilder::shaderFlush(VkDevice device)
+{
+    for (auto& it : _shaders){
+        vkDestroyShaderModule(device, it, nullptr);
+    }
+    _shaderStages.clear();
+    _shaders.clear();
+}
 
 VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 {

@@ -11,10 +11,10 @@ layout (location = 3) in vec3 inColor;
 
 
 layout (location = 0) out vec3 outNormal;
-layout (location = 1) out vec3 outColor;
+layout (location = 1) out vec3 outModelPos;
 layout (location = 2) out vec2 outUV;
-layout (location = 3) out vec3 outViewVec;
-layout (location = 4) out vec3 outLightVec;
+layout (location = 3) out vec3 outpos;
+layout (location = 4) out mat4 invModel;
 
 layout( push_constant ) uniform constants
 {
@@ -26,15 +26,9 @@ layout( push_constant ) uniform constants
 void main() 
 {
 	outNormal = inNormal;
-	outColor = inColor;
+	outModelPos = inPos;
 	outUV = inUV;
+	outpos = (PushConstants.render_matrix * vec4(inPos,1)).xyz;
+	invModel = inverse(PushConstants.render_matrix);
 	gl_Position =  PushConstants.proj * PushConstants.view * PushConstants.render_matrix * vec4(inPos, 1.0f);
-
-	vec4 pos = PushConstants.view * vec4(inPos, 1.0);
-
-	outNormal = mat3(PushConstants.view) * inNormal;
-	vec3 lPos = mat3(PushConstants.view) * sceneData.sunlightDirection.xyz;
-	outLightVec = sceneData.sunlightDirection.xyz - pos.xyz;
-	outViewVec = sceneData.viewPos.xyz - pos.xyz;	
-
 }

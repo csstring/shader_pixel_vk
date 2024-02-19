@@ -6,7 +6,7 @@
 #include "vk_initializers.hpp"
 #include "vk_types.hpp"
 #include <glm/gtx/quaternion.hpp>
-
+#include "glm/gtx/string_cast.hpp"
 #include "glm_element_traits.hpp"
 #include "parser.hpp"
 #include "tools.hpp"
@@ -243,7 +243,7 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter)
     }
 }
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string dirPath, std::string fileName)
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::string dirPath, std::string fileName, MaterialPass passType, glm::mat4 transfrom)
 {
     const std::string filePath = dirPath + fileName;
     std::cout << "Loading GLTF: "<<  filePath << std::endl;
@@ -287,9 +287,9 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
     }
 
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = { 
-      { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,1 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 } };
+      { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,4 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,4 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4 } };
 
 
 
@@ -353,18 +353,20 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
             // if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
             //     passType = MaterialPass::Transparent;
             // }
-            MaterialPass passType = MaterialPass::SkyBox;
             GLTFMetallic_Roughness::MaterialResources materialResources;
             // default the material textures
             // materialResources.colorImage = engine->_errorCheckerboardImage;
             // materialResources.colorSampler = engine->_defaultSamplerLinear;
             // materialResources.metalRoughImage = engine->_errorCheckerboardImage;
             // materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
-            materialResources.colorImage = engine->_skyBoxImage;
-            materialResources.colorSampler = engine->_skyBoxSamplerLinear;
-            materialResources.metalRoughImage = engine->_skyBoxImage;
-            materialResources.metalRoughSampler = engine->_skyBoxSamplerLinear;
-            // set the uniform buffer for the material data
+            materialResources.colorImage = engine->_errorCheckerboardImage;
+            materialResources.colorSampler = engine->_defaultSamplerLinear;
+            // if (passType != MaterialPass::SkyBoxVulkan){
+            //     materialResources.colorImage = engine->_spaceBoxImage;
+            //     materialResources.colorSampler = engine->_spaceBoxSamplerLinear;
+            // }
+            materialResources.metalRoughImage = engine->_errorCheckerboardImage;
+            materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
             materialResources.dataBuffer = file.materialDataBuffer.buffer;
             materialResources.dataBufferOffset = data_index * sizeof(GLTFMetallic_Roughness::MaterialConstants);
             // grab textures from gltf file
@@ -382,7 +384,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
                 }
             }
             std::cerr <<"load_imwrite_materialage" << std::endl;
-            newMat->data = engine->metalRoughMaterial.write_material(engine->_device, passType, materialResources, file.descriptorPool);
+            newMat->data = engine->metalRoughMaterial.write_material(engine, passType, materialResources, file.descriptorPool);
 
             data_index++;
         }
@@ -400,19 +402,22 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
         constants.colorFactors = glm::vec4(1.0f);
         constants.metal_rough_factors = glm::vec4(0.0f);
         sceneMaterialConstants[0] = constants;
-
-        MaterialPass passType = MaterialPass::SkyBox;
+        std::cerr << "empty" << std::endl;
         GLTFMetallic_Roughness::MaterialResources materialResources;
         // default the material textures
-        materialResources.colorImage = engine->_skyBoxImage;
-        materialResources.colorSampler = engine->_skyBoxSamplerLinear;
-        materialResources.metalRoughImage = engine->_skyBoxImage;
-        materialResources.metalRoughSampler = engine->_skyBoxSamplerLinear;
+        materialResources.colorImage = engine->_errorCheckerboardImage;
+        materialResources.colorSampler = engine->_defaultSamplerLinear;
+        // if (passType != MaterialPass::SkyBoxVulkan){
+        //         materialResources.colorImage = engine->_spaceBoxImage;
+        //         materialResources.colorSampler = engine->_spaceBoxSamplerLinear;
+        // }
+        materialResources.metalRoughImage = engine->_errorCheckerboardImage;
+        materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
 
         // set the uniform buffer for the material data
         materialResources.dataBuffer = file.materialDataBuffer.buffer;
         materialResources.dataBufferOffset = 0;
-        newMat->data = engine->metalRoughMaterial.write_material(engine->_device, passType, materialResources, file.descriptorPool);
+        newMat->data = engine->metalRoughMaterial.write_material(engine, passType, materialResources, file.descriptorPool);
     }
     vmaFlushAllocation(engine->_allocator, file.materialDataBuffer.allocation, 0, VK_WHOLE_SIZE);
     std::vector<uint32_t> indices;
@@ -454,7 +459,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
                 fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, posAccessor,
                     [&](glm::vec3 v, size_t index) {
                         Vertex newvtx;
-                        newvtx.position = v;
+                        newvtx.position = transfrom * glm::vec4(v,1.f);
                         newvtx.normal = { 1, 0, 0 };
                         newvtx.color = glm::vec4 { 1.f };
                         newvtx.uv = {0,0};
@@ -575,7 +580,7 @@ void LoadedGLTF::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
     }
 }
 
-void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format)
+void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format, VkSampler* sampler, AllocatedImage* newImage)
 {
     ktxResult result;
     ktxTexture* ktxTexture;
@@ -588,8 +593,40 @@ void loadCubeMap(VulkanEngine* engine, std::string dirPath, std::string fileName
     result = ktxTexture_CreateFromNamedFile(filePath.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
     assert(result == KTX_SUCCESS);
 
-    engine->_skyBoxImage = engine->createCubeImage(ktxTexture, format);
+    *newImage = engine->createCubeImage(ktxTexture, format, sampler);
+    engine->_mainDeletionQueue.push_function([=]() {
+        engine->destroy_image(*newImage);
+    });
+    ktxTexture_Destroy(ktxTexture);
 }   
+
+void loadKtxTexture(VulkanEngine* engine, std::string dirPath, std::string fileName, VkFormat format, AllocatedImage* newImage)
+{
+    ktxResult result;
+    ktxTexture* ktxTexture;
+    const std::string filePath = dirPath + fileName;
+    std::ifstream f(filePath.c_str());
+    if (f.fail()){
+        std::cerr << "load cube file path fail : " << filePath << std::endl;
+    }
+    result = ktxTexture_CreateFromNamedFile(filePath.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
+    assert(result == KTX_SUCCESS);
+    ktx_uint8_t *ktxTextureData = ktxTexture_GetData(ktxTexture);
+	ktx_size_t ktxTextureSize = ktxTexture_GetSize(ktxTexture);
+    VkExtent3D size;
+    size.width = ktxTexture->baseWidth;
+    size.height = ktxTexture->baseHeight;
+	size.depth = 1;
+    std::cout << size.width << std::endl;
+    std::cout << size.height << std::endl;
+    std::cout << size.depth << std::endl;
+    std::cout << ktxTextureSize << std::endl;
+    *newImage = engine->create_image((void*)ktxTextureData, size,format,VK_IMAGE_USAGE_SAMPLED_BIT );
+    engine->_mainDeletionQueue.push_function([=]() {
+        engine->destroy_image(*newImage);
+    });
+    ktxTexture_Destroy(ktxTexture);
+}  
 
 void LoadedGLTF::clearAll()
 {

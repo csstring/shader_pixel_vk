@@ -22,6 +22,7 @@ class Camera
         void mouse_callback( double xposIn, double yposIn);
         glm::vec4 getWorldCursorPos(float width, float height) const;
         const glm::mat4& getProjection() const {return projection;};
+        glm::mat4 getMirrorView(glm::vec3 mirrorNormal,glm::vec3 mirrorPoint);
         static Camera& getInstance() {
           static Camera instance; // Meyers' Singleton
           return instance;
