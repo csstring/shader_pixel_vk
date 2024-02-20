@@ -791,6 +791,11 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageInde
 	for (const RenderObject& draw : mainDrawContext.EnvSurfaces)
 	{
 		VkDeviceSize offset = 0;
+		vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
+		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 0,1, &globalDescriptor,0,nullptr );
+		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 1,1, &draw.material->materialSet,0,nullptr );
+		vkCmdBindIndexBuffer(cmd, draw.indexBuffer,0,VK_INDEX_TYPE_UINT32);
+		vkCmdBindVertexBuffers(cmd, 0, 1, &draw.vertexBuffer, &offset);
 		for (int faceIndex = 0; faceIndex < 6; faceIndex++){
 			VkRenderPassBeginInfo rpInfo = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
 			// Reuse render pass from example pass
@@ -802,11 +807,6 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageInde
 			rpInfo.pClearValues = clearValues;
 			
 		vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
-		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 0,1, &globalDescriptor,0,nullptr );
-		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 1,1, &draw.material->materialSet,0,nullptr );
-		vkCmdBindIndexBuffer(cmd, draw.indexBuffer,0,VK_INDEX_TYPE_UINT32);
-		vkCmdBindVertexBuffers(cmd, 0, 1, &draw.vertexBuffer, &offset);
 
 			glm::mat4 viewMatrix = glm::mat4(1.0f);
 			switch (faceIndex)
@@ -1243,7 +1243,10 @@ void VulkanEngine::update_scene()
 	// loadedScenes["skysphere"]->Draw(s, mainDrawContext);
 	// loadedScenes["cloudCube"]->Draw(_cloud->getModelMatrix(), mainDrawContext);
 	glm::mat4 ro = glm::rotate(glm::mat4(1.0f), rottmp.w, glm::vec3(rottmp));
-	loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
+	static int i = 0;
+
+		loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
+	
 	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // main
 	// loadedScenes["envbox"]->Draw(glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)) * sandTransForm, mainDrawContext);
 	// loadedScenes["sphere"]->Draw(sprTransForm, mainDrawContext);

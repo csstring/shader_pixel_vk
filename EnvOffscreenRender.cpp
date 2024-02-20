@@ -5,7 +5,7 @@
 
 EnvOffscreenRender::EnvOffscreenRender()
 {
-  offscreenImageSize = 1024;
+  offscreenImageSize = 1024 / 8;
 }
 
 EnvOffscreenRender::~EnvOffscreenRender()

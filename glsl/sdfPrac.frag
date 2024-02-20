@@ -650,10 +650,6 @@ float smoothVoronoi( in vec2 x )
 vec3 GetBaseSkyColor(vec3 rayDirection)
 {
     return scatter(vec3(0,sceneData.viewPos.y,0), rayDirection);
-	// return mix(
-    //     vec3(0.2, 0.5, 0.8),
-    //     vec3(0.7, 0.75, 0.9),
-    //      max(rayDirection.y, 0.0));
 }
 
 vec3 GetAmbientSkyColor()
@@ -759,7 +755,8 @@ vec3 GetSkyColor(in vec3 rayDirection)
     // skyColor = mix(skyColor, cloudColor.rgb, cloudColor.a);
 
     // return skyColor.xyz;
-    return texture(skyBox, normalize(rayDirection)).xyz;
+    if (rayDirection.y < 0.02) rayDirection.y = 0.02;
+    return texture(skyBox, (rayDirection)).xyz;
 }
 
 float FresnelFactor(
@@ -1070,60 +1067,6 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
     // return opaqueColor;
     return accumulatedColor + accumulatedColorMultiplier * opaqueColor;
 }
-
-// mat3 GetViewMatrix(float xRotationFactor)
-// { 
-//    float xRotation = ((1.0 - xRotationFactor) - 0.5) * PI * 0.2;
-//    return mat3( cos(xRotation), 0.0, sin(xRotation),
-//                 0.0,           1.0, 0.0,    
-//                 -sin(xRotation),0.0, cos(xRotation));
-// }
-
-// float GetRotationFactor()
-// {
-//     return iMouse.x / iResolution.x;
-// }
-
-// bool IsInputThread(in vec2 fragCoord)
-// {
-//     return ALLOW_KEYBOARD_INPUT != 0 && int(fragCoord.x) == 0 && int(fragCoord.y) == 0;
-// }
-   
-
-// bool KeyDown(int char)
-// {
-//     return int(texelFetch(iChannel1, ivec2(char, 0), 0).x) > 0;
-// }
-
-// void ProcessInput()
-// {
-//     const float WaterIorChangeRate = 0.35;
-// 	if(KeyDown(87)) WaterIor += WaterIorChangeRate * iTimeDelta;
-//     if(KeyDown(83)) WaterIor -= WaterIorChangeRate * iTimeDelta;
-//     WaterIor = clamp(WaterIor, 1.0, 1.8);
-    
-//     const float WaterTurbulanceChangeRate = 7.0;
-// 	if(KeyDown(69)) WaterTurbulence += WaterTurbulanceChangeRate * iTimeDelta;
-//     if(KeyDown(68)) WaterTurbulence -= WaterTurbulanceChangeRate * iTimeDelta;
-//     WaterTurbulence = clamp(WaterTurbulence, 0.0, 50.0);
-       
-//     const float WaterAbsorptionChangeRate = 0.03;
-// 	if(KeyDown(81)) WaterAbsorption += WaterAbsorptionChangeRate * iTimeDelta;
-//     if(KeyDown(65)) WaterAbsorption -= WaterAbsorptionChangeRate * iTimeDelta;
-//     WaterAbsorption = clamp(WaterAbsorption, 0.0, 1.0);
-    
-//     const float ColorChangeRate = 0.5;
-// 	if(KeyDown(89)) WaterColor.r += ColorChangeRate * iTimeDelta;
-//     if(KeyDown(72)) WaterColor.r -= ColorChangeRate * iTimeDelta;
-    
-//     if(KeyDown(85)) WaterColor.g += ColorChangeRate * iTimeDelta;
-//     if(KeyDown(74)) WaterColor.g -= ColorChangeRate * iTimeDelta;
-    
-//     if(KeyDown(73)) WaterColor.b += ColorChangeRate * iTimeDelta;
-//     if(KeyDown(75)) WaterColor.b -= ColorChangeRate * iTimeDelta;
-    
-//     WaterColor = clamp(WaterColor, 0.05, 0.99);
-// }
 
 float EncodeWaterColor()
 {
