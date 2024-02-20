@@ -9,6 +9,7 @@
 #include "ktxvulkan.h"
 #include "Portal.hpp"
 #include "Cloud.hpp"
+#include "EnvOffscreenRender.hpp"
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 class CloudScene;
@@ -23,6 +24,7 @@ struct GLTFMetallic_Roughness {
   MaterialPipeline stencilFillPipeline;
   MaterialPipeline cloudPipeline;
   MaterialPipeline waterPipeline;
+  MaterialPipeline envPipeline;
 	VkDescriptorSetLayout materialLayout;
 
 	struct MaterialConstants {
@@ -47,6 +49,7 @@ struct GLTFMetallic_Roughness {
   void buildWorldSkyBoxpipelines(VulkanEngine* engine);
   void buildstencilFillpipelines(VulkanEngine* engine);
   void build_cloudPipelines(VulkanEngine* engine);
+  void buildEnvOffscreenPipelines(VulkanEngine* engine);
   // void buildReflectpipelines(VulkanEngine* engine);
   
   DescriptorWriter writer;
@@ -87,14 +90,14 @@ class VulkanEngine
     void init_pipelines();
     void init_scene();
     void load_meshes();
-    void draw_objects(VkCommandBuffer cmd,RenderObject* first, int count);
+    void draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageIndex);
+    void draw_env(VkCommandBuffer cmd);
     void init_descriptors();
     void init_imgui();
     void update_scene();
 
   private:  
-    CloudScene* cloudScene;
-
+    
   public :
     void init();
     void cleanup();
@@ -113,6 +116,7 @@ class VulkanEngine
     AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     AllocatedImage createCubeImage(ktxTexture* ktxTexture, VkFormat format, VkSampler* sampler);
+    
     Mesh* get_mesh(const std::string& name);
     size_t pad_uniform_buffer_size(size_t originalSize);
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
@@ -186,4 +190,5 @@ class VulkanEngine
 
     Portal _portalManager;
     CloudScene* _cloud;
+    EnvOffscreenRender* envRender;
 };

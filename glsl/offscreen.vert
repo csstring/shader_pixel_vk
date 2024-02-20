@@ -5,7 +5,11 @@ layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) in vec3 inColor;
 
-layout (location = 0) out vec3 outUVW;
+#extension GL_GOOGLE_include_directive : require
+#include "input_structures.glsl"
+
+
+layout (location = 0) out vec3 outPos;
 
 layout( push_constant ) uniform constants
 {
@@ -16,7 +20,6 @@ layout( push_constant ) uniform constants
 
 void main() 
 {
-  outUVW = inPos;
-  mat4 viewMat = mat4(mat3(PushConstants.render_matrix));
-	gl_Position = PushConstants.proj * PushConstants.view * viewMat * vec4(inPos, 1.0f);
+	gl_Position = PushConstants.proj * PushConstants.view * vec4(inPos, 1.0f);
+  outPos = inPos;
 }

@@ -754,12 +754,12 @@ vec4 GetCloudColor(vec3 position)
 
 vec3 GetSkyColor(in vec3 rayDirection)
 {
-    vec3 skyColor = GetBaseSkyColor(rayDirection);
-    // vec4 cloudColor = GetCloudColor(rayDirection*4.0f );
-    vec4 cloudColor = CloudColor(rayDirection );
-    skyColor = mix(skyColor, cloudColor.rgb, cloudColor.a);
+    // vec3 skyColor = GetBaseSkyColor(rayDirection);
+    // vec4 cloudColor = CloudColor(rayDirection );
+    // skyColor = mix(skyColor, cloudColor.rgb, cloudColor.a);
 
-    return skyColor.xyz;
+    // return skyColor.xyz;
+    return texture(skyBox, normalize(rayDirection)).xyz;
 }
 
 float FresnelFactor(

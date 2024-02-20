@@ -85,6 +85,8 @@ enum class MaterialPass :uint8_t {
     Cloud,
     Reflect,
     StencilFill,
+    Offscreen,
+    OffscreenBox,
     Other
 };
 
@@ -193,6 +195,7 @@ class Scene
 struct DrawContext {
     std::vector<RenderObject> OpaqueSurfaces;
     std::vector<RenderObject> TransparentSurfaces;
+    std::vector<RenderObject> EnvSurfaces;
 };
 
 class IRenderable {

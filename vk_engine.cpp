@@ -44,6 +44,8 @@ void VulkanEngine::init()
 	init_framebuffers();
   init_sync_structures();
 
+	envRender = new EnvOffscreenRender();
+	envRender->initialize(this);
 	init_descriptors();
   init_pipelines();
 	load_meshes();
@@ -69,6 +71,9 @@ void VulkanEngine::init()
 	// auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
 	auto cloudCube = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::Cloud);
 	auto sand = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::MainColor, glm::scale(glm::vec3(0.2f)));
+	auto envoff = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Offscreen, glm::scale(glm::vec3(0.2f)));
+
+	auto envbox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::OffscreenBox,glm::scale(glm::vec3(0.2f)));
 	auto plane_z = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill);
 	auto plane_circle = loadGltf(this,"./assets/models/", "plane_circle.gltf", MaterialPass::StencilFill);
 
@@ -82,6 +87,8 @@ void VulkanEngine::init()
 	assert(plane_circle.has_value());
 	assert(cloudCube.has_value());
 	assert(skysphere.has_value());
+	assert(envoff.has_value());
+	assert(envbox.has_value());
 	loadedScenes["World1_InSkyBox"] = *World1_InSkyBox;
 	loadedScenes["World1_outSkyBox"] = *World1_outSkyBox;
 	loadedScenes["World2_InSkyBox"] = *World2_InSkyBox;
@@ -92,6 +99,8 @@ void VulkanEngine::init()
 	loadedScenes["plane_circle"] = *plane_circle;
 	loadedScenes["cloudCube"] = *cloudCube;
 	loadedScenes["skysphere"] = *skysphere;
+	loadedScenes["envoff"] = *envoff;
+	loadedScenes["envbox"] = *envbox;
 }
 
 void VulkanEngine::init_vulkan()
@@ -412,6 +421,7 @@ void VulkanEngine::init_pipelines()
 	metalRoughMaterial.buildWorldSkyBoxpipelines(this);
 	metalRoughMaterial.buildstencilFillpipelines(this);
 	metalRoughMaterial.build_cloudPipelines(this);
+	metalRoughMaterial.buildEnvOffscreenPipelines(this);
 }
 
 //------------------run-------------
@@ -472,38 +482,11 @@ void VulkanEngine::draw()
 	cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
 	VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
-  VkClearValue clearValue;
-	float flash = abs(sin(_frameNumber / 120.f));
-	clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 
-  VkClearValue depthClear;
-	depthClear.depthStencil = { 1.0f, 0};//info의 max깊이값을 1.0으로 해놔서 이걸로 초기화
-
-  VkClearValue clearValues[] = {clearValue, depthClear};
-	//start the main renderpass.
-	//We will use the clear color from above, and the framebuffer of the index the swapchain gave us
-	VkRenderPassBeginInfo rpInfo = {};
-	rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	rpInfo.pNext = nullptr;
-
-	rpInfo.renderPass = _renderPass;
-	rpInfo.renderArea.offset.x = 0;
-	rpInfo.renderArea.offset.y = 0;
-	rpInfo.renderArea.extent = _windowExtent;
-	rpInfo.framebuffer = _framebuffers[swapchainImageIndex];
-
-	//connect clear values
-	rpInfo.clearValueCount = 2;
-	rpInfo.pClearValues = clearValues;
 	_cloud->update(1.f/ 120.f);
 	// cloudScene->update(1./120., _frameNumber % 2);
 	ImGui::Render();
-	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-  draw_objects(cmd, _renderables.data(), _renderables.size());
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
-
-  vkCmdEndRenderPass(cmd);
+  draw_objects(cmd, swapchainImageIndex);
 	//finalize the command buffer (we can no longer add commands, but it can now be executed)
 	VK_CHECK(vkEndCommandBuffer(cmd));
 
@@ -551,6 +534,7 @@ void VulkanEngine::cleanup()
 		vkDeviceWaitIdle(_device);
     loadedScenes.clear();
 		delete _cloud;
+		delete envRender;
 		for (int i =0; i < FRAME_OVERLAP; ++i){
     	vkWaitForFences(_device, 1, &_frames[i]._renderFence, true, 1000000000);
 			_frames[i]._deletionQueue.flush();
@@ -768,7 +752,11 @@ void VulkanEngine::init_scene()
   // });
 }
 
-void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject* first, int count)
+void VulkanEngine::draw_env(VkCommandBuffer cmd)
+{
+}
+
+void VulkanEngine::draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageIndex)
 {
 
 	AllocatedBuffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -791,13 +779,85 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject* first, int co
 	vmaUnmapMemory(_allocator, gpuSceneDataBuffer.allocation);
 
 	GPUDrawPushConstants pushConstants;
-	pushConstants.view = _camera._view;
+	pushConstants.proj = glm::perspective((float)(M_PI / 2.0f), 1.0f, 0.1f, 1024.0f);
+
+	VkClearValue clearValue;
+	clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+
+  VkClearValue depthClear;
+	depthClear.depthStencil = { 1.0f, 0};//info의 max깊이값을 1.0으로 해놔서 이걸로 초기화
+
+  VkClearValue clearValues[] = {clearValue, depthClear};
+	for (const RenderObject& draw : mainDrawContext.EnvSurfaces)
+	{
+		VkDeviceSize offset = 0;
+		for (int faceIndex = 0; faceIndex < 6; faceIndex++){
+			VkRenderPassBeginInfo rpInfo = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+			// Reuse render pass from example pass
+			rpInfo.renderPass = envRender->offscreenRenderPass;
+			rpInfo.framebuffer = envRender->frameBuffers[faceIndex];
+			rpInfo.renderArea.extent.width = envRender->offscreenImageSize;
+			rpInfo.renderArea.extent.height = envRender->offscreenImageSize;
+			rpInfo.clearValueCount = 2;
+			rpInfo.pClearValues = clearValues;
+			
+		vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
+		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 0,1, &globalDescriptor,0,nullptr );
+		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 1,1, &draw.material->materialSet,0,nullptr );
+		vkCmdBindIndexBuffer(cmd, draw.indexBuffer,0,VK_INDEX_TYPE_UINT32);
+		vkCmdBindVertexBuffers(cmd, 0, 1, &draw.vertexBuffer, &offset);
+
+			glm::mat4 viewMatrix = glm::mat4(1.0f);
+			switch (faceIndex)
+			{
+			case 0: // POSITIVE_X
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 1:	// NEGATIVE_X
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 2:	// POSITIVE_Y
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 3:	// NEGATIVE_Y
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 4:	// POSITIVE_Z
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 5:	// NEGATIVE_Z
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+				break;
+			}
+			pushConstants.view = viewMatrix;
+			vkCmdPushConstants(cmd, draw.material->pipeline->layout ,VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0, sizeof(GPUDrawPushConstants), &pushConstants);
+			vkCmdDrawIndexed(cmd, draw.indexCount,1,draw.firstIndex,0,0);
+			vkCmdEndRenderPass(cmd);
+		}
+	}
+	//start the main renderpass.
+	VkRenderPassBeginInfo rpInfo = {};
+	rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rpInfo.pNext = nullptr;
+
+	rpInfo.renderPass = _renderPass;
+	rpInfo.renderArea.offset.x = 0;
+	rpInfo.renderArea.offset.y = 0;
+	rpInfo.renderArea.extent = _windowExtent;
+	rpInfo.framebuffer = _framebuffers[swapchainImageIndex];
+
+	//connect clear values
+	rpInfo.clearValueCount = 2;
+	rpInfo.pClearValues = clearValues;
+	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
 	pushConstants.proj = _camera.getProjection();
 	pushConstants.proj[1][1] *= -1;
-	
-
 	for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces)
 	{
+		pushConstants.view = _camera._view;
 		VkDeviceSize offset = 0;
 		vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
 		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 0,1, &globalDescriptor,0,nullptr );
@@ -817,6 +877,10 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, RenderObject* first, int co
 		}
 		vkCmdDrawIndexed(cmd, draw.indexCount,1,draw.firstIndex,0,0);
 	}
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+
+  vkCmdEndRenderPass(cmd);
+
 	//mirror
 	// for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces)
 	// {
@@ -1167,6 +1231,7 @@ void VulkanEngine::update_scene()
 	auto now = std::chrono::high_resolution_clock::now();
 	Camera& _camera = Camera::getInstance();
 	mainDrawContext.OpaqueSurfaces.clear();
+	mainDrawContext.EnvSurfaces.clear();
 	//cloud render
 	// {
 	// _portalManager.update();
@@ -1178,7 +1243,9 @@ void VulkanEngine::update_scene()
 	// loadedScenes["skysphere"]->Draw(s, mainDrawContext);
 	// loadedScenes["cloudCube"]->Draw(_cloud->getModelMatrix(), mainDrawContext);
 	glm::mat4 ro = glm::rotate(glm::mat4(1.0f), rottmp.w, glm::vec3(rottmp));
-	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext);
+	loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
+	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // main
+	// loadedScenes["envbox"]->Draw(glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)) * sandTransForm, mainDrawContext);
 	// loadedScenes["sphere"]->Draw(sprTransForm, mainDrawContext);
 	// switch (_portalManager.getPortalState())
 	// {
@@ -1284,6 +1351,26 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VulkanEngine* engine, Ma
     resources.colorSampler = engine->_defaultSamplerLinear;
 		resources.metalRoughImage = engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT];
 		resources.metalRoughSampler = engine->_defaultSamplerLinear;
+		// resources.skyBoxImage = engine->_vulkanBoxImage;
+    // resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
+		resources.skyBoxImage = engine->envRender->envCubeImage;
+    resources.skyBoxSampler = engine->envRender->sampler;
+		matData.materialSet = descriptorAllocator.allocate(engine->_device, materialLayout);
+
+		writer.clear();
+		writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+		writer.write_image(1, resources.colorImage._imageView, resources.colorSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.write_image(2, resources.metalRoughImage._imageView, resources.metalRoughSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.write_image(3, resources.skyBoxImage._imageView, resources.skyBoxSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.update_set(engine->_device, matData.materialSet);
+		return matData;
+		break;
+	case MaterialPass::Offscreen:
+		matData.pipeline = &envPipeline;
+		resources.colorImage = engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY];
+    resources.colorSampler = engine->_defaultSamplerLinear;
+		resources.metalRoughImage = engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT];
+		resources.metalRoughSampler = engine->_defaultSamplerLinear;
 		resources.skyBoxImage = engine->_vulkanBoxImage;
     resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		matData.materialSet = descriptorAllocator.allocate(engine->_device, materialLayout);
@@ -1295,6 +1382,11 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VulkanEngine* engine, Ma
 		writer.write_image(3, resources.skyBoxImage._imageView, resources.skyBoxSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		writer.update_set(engine->_device, matData.materialSet);
 		return matData;
+		break;
+	case MaterialPass::OffscreenBox:
+		matData.pipeline = &world_OutSkyBoxPipeline;
+		resources.skyBoxImage = engine->envRender->envCubeImage;
+    resources.skyBoxSampler = engine->envRender->sampler;
 		break;
 	case MaterialPass::Reflect:
 		matData.pipeline = &reflectPipeline;
@@ -1379,8 +1471,10 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
 		def.material = &s.material->data;
 
 		def.transform = nodeMatrix;
-		
-		ctx.OpaqueSurfaces.push_back(def);
+		if (s.material->data.passType == MaterialPass::Offscreen)
+			ctx.EnvSurfaces.push_back(def);
+		else
+			ctx.OpaqueSurfaces.push_back(def);
 	}
 
 	// recurse down
@@ -1398,7 +1492,7 @@ void GLTFMetallic_Roughness::buildWorldSkyBoxpipelines(VulkanEngine* engine)
 	VkPushConstantRange matrixRange{};
 	matrixRange.offset = 0;
 	matrixRange.size = sizeof(GPUDrawPushConstants);
-	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	VkDescriptorSetLayout layouts[] = { 
 			engine->_gpuSceneDataDescriptorLayout,
@@ -1452,7 +1546,50 @@ void GLTFMetallic_Roughness::buildWorldSkyBoxpipelines(VulkanEngine* engine)
   });
 }
 
+void GLTFMetallic_Roughness::buildEnvOffscreenPipelines(VulkanEngine* engine)
+{
+	VkPushConstantRange matrixRange{};
+	matrixRange.offset = 0;
+	matrixRange.size = sizeof(GPUDrawPushConstants);
+	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
+	VkDescriptorSetLayout layouts[] = { 
+			engine->_gpuSceneDataDescriptorLayout,
+      materialLayout };
+
+	VkPipelineLayoutCreateInfo env_layout_info = vkinit::pipeline_layout_create_info();
+	env_layout_info.setLayoutCount = 2;
+	env_layout_info.pSetLayouts = layouts;
+	env_layout_info.pPushConstantRanges = &matrixRange;
+	env_layout_info.pushConstantRangeCount = 1;
+
+	VkPipelineLayout newLayout;
+	VK_CHECK(vkCreatePipelineLayout(engine->_device, &env_layout_info, nullptr, &newLayout));
+
+  envPipeline.layout = newLayout;
+	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
+	PipelineBuilder pipelineBuilder;
+	pipelineBuilder.loadShader("./spv/offscreen.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
+	pipelineBuilder.loadShader("./spv/offscreen.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info(vertexDescription);
+	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
+	pipelineBuilder._viewport = vkinit::viewport_create_info({engine->envRender->offscreenImageSize,engine->envRender->offscreenImageSize});
+	pipelineBuilder._scissor = vkinit::scissor_create_info({engine->envRender->offscreenImageSize,engine->envRender->offscreenImageSize});
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
+	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(0xf, VK_FALSE);
+	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+	pipelineBuilder._pipelineLayout = newLayout;
+	
+  envPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->envRender->offscreenRenderPass);
+
+	pipelineBuilder.shaderFlush(engine->_device);
+
+	engine->_mainDeletionQueue.push_function([=]() {
+		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
+		vkDestroyPipeline(engine->_device, envPipeline.pipeline, nullptr);
+  });
+}
 void GLTFMetallic_Roughness::buildstencilFillpipelines(VulkanEngine* engine)
 {
 	VkPushConstantRange matrixRange{};
