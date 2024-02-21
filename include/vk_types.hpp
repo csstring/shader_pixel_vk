@@ -77,24 +77,23 @@ struct Material {
 enum class MaterialPass :uint8_t {
     MainColor,
     Transparent,
-    World1_InSkyBox,
-    World1_outSkyBox,
-    World2_InSkyBox,
-    World2_outSkyBox,
+    World1_SkyBox,
     SkySphere,
     Cloud,
     Reflect,
-    StencilFill,
+    StencilFill_Zero,
+    StencilFill_One,
     Offscreen,
     OffscreenBox,
+    Julia,
     Other
 };
 
 enum class PortalState :uint8_t {
+  Only_World0,
   Only_World1,
-  Only_World2,
-  In_World1,
-  In_World2
+  In_World0,
+  In_World1
 };
 
 struct MaterialPipeline {

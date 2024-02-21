@@ -57,50 +57,42 @@ void VulkanEngine::init()
 	_cloud = new CloudScene();
 	_cloud->initialize(this);
   init_scene();
-	_portalManager.initialize(glm::scale(glm::mat4(1.0f), glm::vec3(20.0f)), glm::mat4(1.0f), PortalState::In_World1);
+	_portalManager.initialize(glm::scale(glm::mat4(1.0f), glm::vec3(10.0f)), glm::translate(glm::vec3(0, 40, -4 )), PortalState::In_World0);
   // auto FlightHelmetFile = loadGltf(this,"./assets/models/FlightHelmet/glTF/", "FlightHelmet.gltf");
   // assert(FlightHelmetFile.has_value());
   // loadedScenes["FlightHelmet"] = *FlightHelmetFile;
 
 	auto sphere = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::MainColor);
-	auto World1_InSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World1_InSkyBox);
-	auto World1_outSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World1_outSkyBox);
-	auto World2_InSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World2_InSkyBox);
-	auto World2_outSkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World2_outSkyBox);
+	auto World1_SkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World1_SkyBox);
 	auto skysphere = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::SkySphere);
+	auto julia = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Julia, glm::scale(glm::vec3(0.2f)));
 	// auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
 	auto cloudCube = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::Cloud);
 	auto sand = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::MainColor, glm::scale(glm::vec3(0.2f)));
 	auto envoff = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Offscreen, glm::scale(glm::vec3(0.2f)));
 
-	auto envbox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::OffscreenBox,glm::scale(glm::vec3(0.2f)));
-	auto plane_z = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill);
-	auto plane_circle = loadGltf(this,"./assets/models/", "plane_circle.gltf", MaterialPass::StencilFill);
+	auto StencilFill_Zero = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill_Zero);
+	auto StencilFill_One = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill_One);
 
-	assert(World1_InSkyBox.has_value());
-	assert(World1_outSkyBox.has_value());
-	assert(World2_InSkyBox.has_value());
-	assert(World2_outSkyBox.has_value());
+	assert(World1_SkyBox.has_value());
 	assert(sphere.has_value());
 	assert(sand.has_value());
-	assert(plane_z.has_value());
-	assert(plane_circle.has_value());
+	assert(StencilFill_Zero.has_value());
+	assert(StencilFill_One.has_value());
 	assert(cloudCube.has_value());
 	assert(skysphere.has_value());
 	assert(envoff.has_value());
-	assert(envbox.has_value());
-	loadedScenes["World1_InSkyBox"] = *World1_InSkyBox;
-	loadedScenes["World1_outSkyBox"] = *World1_outSkyBox;
-	loadedScenes["World2_InSkyBox"] = *World2_InSkyBox;
-	loadedScenes["World2_outSkyBox"] = *World2_outSkyBox;
+	assert(julia.has_value());
+
+	loadedScenes["World1_SkyBox"] = *World1_SkyBox;
 	loadedScenes["sphere"] = *sphere;
 	loadedScenes["sand"] = *sand;
-	loadedScenes["plane_z"] = *plane_z;
-	loadedScenes["plane_circle"] = *plane_circle;
+	loadedScenes["StencilFill_Zero"] = *StencilFill_Zero;
+	loadedScenes["StencilFill_One"] = *StencilFill_One;
 	loadedScenes["cloudCube"] = *cloudCube;
 	loadedScenes["skysphere"] = *skysphere;
 	loadedScenes["envoff"] = *envoff;
-	loadedScenes["envbox"] = *envbox;
+	loadedScenes["julia"] = *julia;
 }
 
 void VulkanEngine::init_vulkan()
@@ -422,6 +414,7 @@ void VulkanEngine::init_pipelines()
 	metalRoughMaterial.buildstencilFillpipelines(this);
 	metalRoughMaterial.build_cloudPipelines(this);
 	metalRoughMaterial.buildEnvOffscreenPipelines(this);
+	metalRoughMaterial.buildJuliapipelines(this);
 }
 
 //------------------run-------------
@@ -839,6 +832,8 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageInde
 		}
 	}
 	//start the main renderpass.
+	depthClear.depthStencil = { 1.0f, _portalManager.getWorldIndex()};//info의 max깊이값을 1.0으로 해놔서 이걸로 초기화
+  clearValues[1] = depthClear;
 	VkRenderPassBeginInfo rpInfo = {};
 	rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	rpInfo.pNext = nullptr;
@@ -1234,22 +1229,32 @@ void VulkanEngine::update_scene()
 	mainDrawContext.EnvSurfaces.clear();
 	//cloud render
 	// {
-	// _portalManager.update();
+	_portalManager.update();
 	glm::mat4 s = glm::scale(glm::mat4(1.0f), glm::vec3(240.0f));
 	// loadedScenes["World1_outSkyBox"]->Draw(s, mainDrawContext);
 	// }
 	glm::mat4 sandTransForm = glm::translate(glm::vec3(0, -0, -0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(100.0f));
-	glm::mat4 sprTransForm = glm::translate(glm::vec3(0, -0, 0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
+	glm::mat4 sprTransForm = glm::translate(glm::vec3(0, 40, 0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(40.0f));
 	// loadedScenes["skysphere"]->Draw(s, mainDrawContext);
 	// loadedScenes["cloudCube"]->Draw(_cloud->getModelMatrix(), mainDrawContext);
 	glm::mat4 ro = glm::rotate(glm::mat4(1.0f), rottmp.w, glm::vec3(rottmp));
-	static int i = 0;
-
-		loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
-	
+	switch (_portalManager.getPortalState())
+	{
+	case PortalState::In_World0:
+		loadedScenes["StencilFill_One"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
+		break;
+	case PortalState::In_World1:
+		loadedScenes["StencilFill_Zero"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
+		break;
+	default:
+		break;
+	}
+	loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
+	loadedScenes["julia"]->Draw(sprTransForm ,mainDrawContext);
 	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // main
-	// loadedScenes["envbox"]->Draw(glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)) * sandTransForm, mainDrawContext);
-	// loadedScenes["sphere"]->Draw(sprTransForm, mainDrawContext);
+
+
+	loadedScenes["World1_SkyBox"]->Draw(sprTransForm, mainDrawContext);
 	// switch (_portalManager.getPortalState())
 	// {
 	// case PortalState::In_World1:
@@ -1316,7 +1321,15 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(0xf, VK_FALSE);
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 	pipelineBuilder._pipelineLayout = newLayout;
-
+	pipelineBuilder._depthStencil.stencilTestEnable = VK_TRUE;
+	pipelineBuilder._depthStencil.back.compareMask = 0xff;
+	pipelineBuilder._depthStencil.back.writeMask = 0xff;
+	pipelineBuilder._depthStencil.back.reference = 0;
+	pipelineBuilder._depthStencil.back.compareOp = VK_COMPARE_OP_EQUAL;
+	pipelineBuilder._depthStencil.back.failOp = VK_STENCIL_OP_KEEP;
+	pipelineBuilder._depthStencil.back.depthFailOp = VK_STENCIL_OP_KEEP;
+	pipelineBuilder._depthStencil.back.passOp = VK_STENCIL_OP_KEEP;
+	pipelineBuilder._depthStencil.front = pipelineBuilder._depthStencil.back;
   waterPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 	pipelineBuilder.shaderFlush(engine->_device);
 
@@ -1386,40 +1399,25 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VulkanEngine* engine, Ma
 		writer.update_set(engine->_device, matData.materialSet);
 		return matData;
 		break;
-	case MaterialPass::OffscreenBox:
-		matData.pipeline = &world_OutSkyBoxPipeline;
-		resources.skyBoxImage = engine->envRender->envCubeImage;
-    resources.skyBoxSampler = engine->envRender->sampler;
-		break;
 	case MaterialPass::Reflect:
 		matData.pipeline = &reflectPipeline;
 		resources.skyBoxImage = engine->_vulkanBoxImage;
     resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		break;
-	case MaterialPass::StencilFill:
-		matData.pipeline = &stencilFillPipeline;
+	case MaterialPass::StencilFill_Zero:
+		matData.pipeline = &stencilFill_Zero_Pipeline;
 		resources.skyBoxImage = engine->_vulkanBoxImage;
     resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		break;
-	case MaterialPass::World1_InSkyBox:
-		matData.pipeline = &world_INskyBoxPipeline;
+	case MaterialPass::StencilFill_One:
+		matData.pipeline = &stencilFill_One_Pipeline;
 		resources.skyBoxImage = engine->_vulkanBoxImage;
     resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		break;
-	case MaterialPass::World1_outSkyBox:
-		matData.pipeline = &world_OutSkyBoxPipeline;
+	case MaterialPass::World1_SkyBox:
+		matData.pipeline = &world_skyBoxPipeline;
 		resources.skyBoxImage = engine->_vulkanBoxImage;
     resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
-		break;
-	case MaterialPass::World2_InSkyBox:
-		matData.pipeline = &world_INskyBoxPipeline;
-		resources.skyBoxImage = engine->_spaceBoxImage;
-    resources.skyBoxSampler = engine->_spaceBoxSamplerLinear;
-		break;
-	case MaterialPass::World2_outSkyBox:
-		matData.pipeline = &world_OutSkyBoxPipeline;
-		resources.skyBoxImage = engine->_spaceBoxImage;
-    resources.skyBoxSampler = engine->_spaceBoxSamplerLinear;
 		break;
 	case MaterialPass::Cloud:
 		matData.pipeline = &cloudPipeline;
@@ -1444,6 +1442,11 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VulkanEngine* engine, Ma
     resources.colorSampler = engine->_defaultSamplerLinear;
 		resources.skyBoxImage = engine->_spaceBoxImage;
     resources.skyBoxSampler = engine->_spaceBoxSamplerLinear;
+		break;
+	case MaterialPass::Julia:
+		matData.pipeline = &juliaPipeline;
+		resources.skyBoxImage = engine->_vulkanBoxImage;
+    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		break;
 	default:
 		break;
@@ -1510,8 +1513,7 @@ void GLTFMetallic_Roughness::buildWorldSkyBoxpipelines(VulkanEngine* engine)
 	VkPipelineLayout newLayout;
 	VK_CHECK(vkCreatePipelineLayout(engine->_device, &skybox_layout_info, nullptr, &newLayout));
 
-  world_INskyBoxPipeline.layout = newLayout;
-  world_OutSkyBoxPipeline.layout = newLayout;
+  world_skyBoxPipeline.layout = newLayout;
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 	PipelineBuilder pipelineBuilder;
 	pipelineBuilder.loadShader("./spv/skybox.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
@@ -1520,7 +1522,7 @@ void GLTFMetallic_Roughness::buildWorldSkyBoxpipelines(VulkanEngine* engine)
 	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
 	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
 	pipelineBuilder._scissor = vkinit::scissor_create_info(engine->_windowExtent);
-	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
 	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
 	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(0xf, VK_FALSE);
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
@@ -1535,17 +1537,13 @@ void GLTFMetallic_Roughness::buildWorldSkyBoxpipelines(VulkanEngine* engine)
 	pipelineBuilder._depthStencil.back.depthFailOp = VK_STENCIL_OP_KEEP;
 	pipelineBuilder._depthStencil.back.passOp = VK_STENCIL_OP_KEEP;
 	pipelineBuilder._depthStencil.front = pipelineBuilder._depthStencil.back;
-  world_INskyBoxPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
+  world_skyBoxPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 
-	pipelineBuilder._depthStencil.back.compareOp = VK_COMPARE_OP_NOT_EQUAL;
-	pipelineBuilder._depthStencil.front.compareOp = VK_COMPARE_OP_NOT_EQUAL;
-	world_OutSkyBoxPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 	pipelineBuilder.shaderFlush(engine->_device);
 
 	engine->_mainDeletionQueue.push_function([=]() {
 		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
-		vkDestroyPipeline(engine->_device, world_INskyBoxPipeline.pipeline, nullptr);
-		vkDestroyPipeline(engine->_device, world_OutSkyBoxPipeline.pipeline, nullptr);
+		vkDestroyPipeline(engine->_device, world_skyBoxPipeline.pipeline, nullptr);
   });
 }
 
@@ -1593,12 +1591,13 @@ void GLTFMetallic_Roughness::buildEnvOffscreenPipelines(VulkanEngine* engine)
 		vkDestroyPipeline(engine->_device, envPipeline.pipeline, nullptr);
   });
 }
+
 void GLTFMetallic_Roughness::buildstencilFillpipelines(VulkanEngine* engine)
 {
 	VkPushConstantRange matrixRange{};
 	matrixRange.offset = 0;
 	matrixRange.size = sizeof(GPUDrawPushConstants);
-	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	VkDescriptorSetLayout layouts[] = { 
 			engine->_gpuSceneDataDescriptorLayout,
@@ -1613,7 +1612,8 @@ void GLTFMetallic_Roughness::buildstencilFillpipelines(VulkanEngine* engine)
 	VkPipelineLayout newLayout;
 	VK_CHECK(vkCreatePipelineLayout(engine->_device, &stencilFill_layout_info, nullptr, &newLayout));
 
-	stencilFillPipeline.layout = newLayout;
+	stencilFill_Zero_Pipeline.layout = newLayout;
+	stencilFill_One_Pipeline.layout = newLayout;
 
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 	PipelineBuilder pipelineBuilder;
@@ -1623,13 +1623,12 @@ void GLTFMetallic_Roughness::buildstencilFillpipelines(VulkanEngine* engine)
 	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
 	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
 	pipelineBuilder._scissor = vkinit::scissor_create_info(engine->_windowExtent);
-	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
 	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
 	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(0xf, VK_FALSE);
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(false, false, VK_COMPARE_OP_LESS_OR_EQUAL);
 	pipelineBuilder._pipelineLayout = newLayout;
 
-	pipelineBuilder._rasterizer .cullMode = VK_CULL_MODE_NONE;
 	pipelineBuilder._depthStencil.stencilTestEnable = VK_TRUE;
 	pipelineBuilder._depthStencil.back.compareOp = VK_COMPARE_OP_ALWAYS;
 	pipelineBuilder._depthStencil.back.failOp = VK_STENCIL_OP_REPLACE;
@@ -1637,15 +1636,20 @@ void GLTFMetallic_Roughness::buildstencilFillpipelines(VulkanEngine* engine)
 	pipelineBuilder._depthStencil.back.passOp = VK_STENCIL_OP_REPLACE;
 	pipelineBuilder._depthStencil.back.compareMask = 0xff;
 	pipelineBuilder._depthStencil.back.writeMask = 0xff;
-	pipelineBuilder._depthStencil.back.reference = 1;
+	pipelineBuilder._depthStencil.back.reference = 0;
 	pipelineBuilder._depthStencil.front = pipelineBuilder._depthStencil.back;
 
-  stencilFillPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
+  stencilFill_Zero_Pipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
+
+	pipelineBuilder._depthStencil.back.reference = 1;
+	pipelineBuilder._depthStencil.front = pipelineBuilder._depthStencil.back;
+	stencilFill_One_Pipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 	pipelineBuilder.shaderFlush(engine->_device);
 
 	engine->_mainDeletionQueue.push_function([=]() {
 		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
-		vkDestroyPipeline(engine->_device, stencilFillPipeline.pipeline, nullptr);
+		vkDestroyPipeline(engine->_device, stencilFill_Zero_Pipeline.pipeline, nullptr);
+		vkDestroyPipeline(engine->_device, stencilFill_One_Pipeline.pipeline, nullptr);
   });
 }
 
@@ -1692,5 +1696,58 @@ void GLTFMetallic_Roughness::build_cloudPipelines(VulkanEngine* engine)
 	engine->_mainDeletionQueue.push_function([=]() {
 		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
 		vkDestroyPipeline(engine->_device, cloudPipeline.pipeline, nullptr);
+  });
+}
+
+void GLTFMetallic_Roughness::buildJuliapipelines(VulkanEngine* engine)
+{
+	VkPushConstantRange matrixRange{};
+	matrixRange.offset = 0;
+	matrixRange.size = sizeof(GPUDrawPushConstants);
+	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayout layouts[] = { 
+			engine->_gpuSceneDataDescriptorLayout,
+      materialLayout };
+
+	VkPipelineLayoutCreateInfo skybox_layout_info = vkinit::pipeline_layout_create_info();
+	skybox_layout_info.setLayoutCount = 2;
+	skybox_layout_info.pSetLayouts = layouts;
+	skybox_layout_info.pPushConstantRanges = &matrixRange;
+	skybox_layout_info.pushConstantRangeCount = 1;
+
+	VkPipelineLayout newLayout;
+	VK_CHECK(vkCreatePipelineLayout(engine->_device, &skybox_layout_info, nullptr, &newLayout));
+
+  juliaPipeline.layout = newLayout;
+	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
+	PipelineBuilder pipelineBuilder;
+	pipelineBuilder.loadShader("./spv/julia.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
+	pipelineBuilder.loadShader("./spv/julia.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info(vertexDescription);
+	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
+	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
+	pipelineBuilder._scissor = vkinit::scissor_create_info(engine->_windowExtent);
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
+	pipelineBuilder._colorBlendAttachment = vkinit::color_blend_attachment_state(0xf, VK_FALSE);
+	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+	pipelineBuilder._pipelineLayout = newLayout;
+	pipelineBuilder._depthStencil.stencilTestEnable = VK_TRUE;
+	pipelineBuilder._depthStencil.back.compareMask = 0xff;
+	pipelineBuilder._depthStencil.back.writeMask = 0xff;
+	pipelineBuilder._depthStencil.back.reference = 1;
+	pipelineBuilder._depthStencil.back.compareOp = VK_COMPARE_OP_EQUAL;
+	pipelineBuilder._depthStencil.back.failOp = VK_STENCIL_OP_KEEP;
+	pipelineBuilder._depthStencil.back.depthFailOp = VK_STENCIL_OP_KEEP;
+	pipelineBuilder._depthStencil.back.passOp = VK_STENCIL_OP_KEEP;
+	pipelineBuilder._depthStencil.front = pipelineBuilder._depthStencil.back;
+
+  juliaPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
+	pipelineBuilder.shaderFlush(engine->_device);
+
+	engine->_mainDeletionQueue.push_function([=]() {
+		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
+		vkDestroyPipeline(engine->_device, juliaPipeline.pipeline, nullptr);
   });
 }

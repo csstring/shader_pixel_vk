@@ -17,14 +17,16 @@ class CloudScene;
 struct GLTFMetallic_Roughness {
 	MaterialPipeline opaquePipeline;
 	MaterialPipeline transparentPipeline;
-  MaterialPipeline world_INskyBoxPipeline;
-  MaterialPipeline world_OutSkyBoxPipeline;
+  MaterialPipeline world_skyBoxPipeline;
 
   MaterialPipeline reflectPipeline;
-  MaterialPipeline stencilFillPipeline;
+  MaterialPipeline stencilFill_Zero_Pipeline;
+  MaterialPipeline stencilFill_One_Pipeline;
   MaterialPipeline cloudPipeline;
   MaterialPipeline waterPipeline;
   MaterialPipeline envPipeline;
+  MaterialPipeline juliaPipeline;
+
 	VkDescriptorSetLayout materialLayout;
 
 	struct MaterialConstants {
@@ -50,6 +52,7 @@ struct GLTFMetallic_Roughness {
   void buildstencilFillpipelines(VulkanEngine* engine);
   void build_cloudPipelines(VulkanEngine* engine);
   void buildEnvOffscreenPipelines(VulkanEngine* engine);
+  void buildJuliapipelines(VulkanEngine* engine);
   // void buildReflectpipelines(VulkanEngine* engine);
   
   DescriptorWriter writer;

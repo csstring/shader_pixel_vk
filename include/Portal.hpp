@@ -16,5 +16,6 @@ class Portal
     void initialize(glm::mat4 scale, glm::mat4 translate, PortalState state);
     void update();
     PortalState getPortalState(){return state;};
-    glm::mat4 getModelTransForm(){return scale * translate;};
+    glm::mat4 getModelTransForm(){return translate * scale;};
+    uint32_t getWorldIndex(){return state == PortalState::In_World0 ? 0 : 1;};
 };

@@ -25,7 +25,7 @@ layout(set = 0, binding = 0) uniform  SceneData{
 	vec4 sunlightDirection; //w for sun power
 	vec4 sunlightColor;
 	vec4 viewPos;
-  vec4 waterData; //a.time, b.WaterTurbulence c.WaterAbsorption d.color
+    vec4 waterData; //a.time, b.WaterTurbulence c.WaterAbsorption d.color
 } sceneData;
 
 layout(set = 1, binding = 1) uniform sampler3D densityTex;
@@ -67,7 +67,7 @@ vec3 GetAmbientSkyColor()
 
 vec4 CloudColor(vec3 dir)
 {
-    int numSteps = 32;
+    int numSteps = 64;
     float stepSize = 0.8 / float(numSteps);
     vec3 volumeAlbedo = vec3(1, 1, 1);
     vec4 color = vec4(0, 0, 0, 1);
@@ -127,11 +127,11 @@ vec3 scatter(vec3 o, vec3 d) {
 	float opmu2 = 1. + mu*mu;
 	float phaseR = .0596831 * opmu2;
 	float phaseM = .1193662 * (1. - g2) * opmu2 / ((2. + g2) * pow(1. + g2 - 2.*g*mu, 1.5));
-  float phaseS = .1193662 * (1. - s2) * opmu2 / ((2. + s2) * pow(1. + s2 - 2.*s*mu, 1.5));
+    float phaseS = .1193662 * (1. - s2) * opmu2 / ((2. + s2) * pow(1. + s2 - 2.*s*mu, 1.5));
 	
 	float depthR = 0., depthM = 0.;
 	vec3 R = vec3(0.), M = vec3(0.);
-  float step = 8;
+    float step = 16;
 	float dl = L / float(step);
 	for (int i = 0; i < step; ++i) {
 		float l = float(i) * dl;

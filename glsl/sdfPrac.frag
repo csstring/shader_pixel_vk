@@ -327,7 +327,7 @@ void GetSphere(int index, out vec3 origin, out float radius)
 
 float GetWaterWavesDisplacement(vec3 position, float time)
 {
-    return 0 * sin(position.x / 15.0 + time * 1.3) + 0 * cos(position.z / 150.0 + time / 1.1) +4;
+    return 4 * sin(position.x / 15.0 + time * 1.3) + 5 * cos(position.z / 150.0 + time / 1.1) +4;
 }
 
 float GetWaterNoise(vec3 position, float time)

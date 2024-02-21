@@ -15,7 +15,7 @@ void Portal::update()
     return;
   }
   CAMERA_MOVE_DIR curDir = cam._moveDir == CAMERA_MOVE_DIR::MOVE_STOP ? beforeDir : cam._moveDir;
-  state = state == PortalState::In_World1 ? PortalState::In_World2 : PortalState::In_World1;
+  state = state == PortalState::In_World0 ? PortalState::In_World1 : PortalState::In_World0;
   switch (curDir)
   {
     // std::cout << glm::to_string(cam._cameraFront) << std::endl;
@@ -42,10 +42,10 @@ void Portal::initialize(glm::mat4 scale, glm::mat4 translate, PortalState state)
   this->translate = translate;
   this->scale = scale;
   this->state = state;
-  xmin = (scale * translate * glm::vec4(-0.5,0,0,1)).x;
-  xmax = (scale * translate * glm::vec4(0.5,0,0,1)).x;
-  ymin = (scale * translate * glm::vec4(0,-0.5,0,1)).y;
-  ymax = (scale * translate * glm::vec4(0,0.5,0,1)).y;
+  xmin = (translate * scale * glm::vec4(-0.5,0,0,1)).x;
+  xmax = (translate * scale * glm::vec4(0.5,0,0,1)).x;
+  ymin = (translate * scale * glm::vec4(0,-0.5,0,1)).y;
+  ymax = (translate * scale * glm::vec4(0,0.5,0,1)).y;
   zmin = (translate * glm::vec4(0,0,-0.5,1)).z;
   zmax = (translate * glm::vec4(0,0,0.5,1)).z;
   Camera& cam = Camera::getInstance();
