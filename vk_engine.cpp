@@ -1250,7 +1250,7 @@ void VulkanEngine::update_scene()
 		break;
 	}
 	loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
-	loadedScenes["julia"]->Draw(sprTransForm ,mainDrawContext);
+	loadedScenes["julia"]->Draw(glm::scale(glm::mat4(1.0f), glm::vec3(40.0f)) ,mainDrawContext);
 	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // main
 
 

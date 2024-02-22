@@ -72,34 +72,30 @@ float map( in vec3 p, in vec3 c, out vec4 resColor )
 
 float raycast( in vec3 ro, in vec3 rd, out vec4 rescol, float fov, vec3 c )
 {
-    float res = -1.0;
-
-    // bounding volume
-    vec2 dis = isphere( vec4( 0.0, 0.0, 0.0, 1. ), ro, rd );
-    if( dis.y<0.0 )
-        return -1.0;
-    dis.x = max( dis.x, 0.0 );
+  float res = -1.0;
+  vec2 dis = isphere( vec4( 0.0, 0.0, 0.0, 1.25), ro, rd );
+  if( dis.y<0.0 )
+    return -1.0;
+  dis.x = max( dis.x, 0.0 );
 
 	vec4 trap;
 	float t = dis.x;
-	for( int i=0; i<64; i++  )
-    { 
-        vec3 p = ro + rd*t;
-
+	for( int i=0; i<32; i++  )
+  { 
+    vec3 p = ro + rd*t;
 		float dt = map( p, c, trap );
 		if( t>dis.y || dt<1e-3 ) break;
-
-        t += min(dt,0.05);
-    }
+    t += min(dt,0.05);
+  }
     
     
-    if( t<dis.y )
-    {
-        rescol = trap;
-        res = t;
-    }
+  if( t<dis.y )
+  {
+    rescol = trap;
+    res = t;
+  }
 
-    return res;
+  return res;
 }
 
 vec3 GetNormal( in vec3 pos, vec3 c )
