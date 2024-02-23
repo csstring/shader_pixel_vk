@@ -60,6 +60,6 @@ void main() {
     ivec3 dtID = ivec3(gl_GlobalInvocationID.xyz);
     vec3 uvw = (vec3(dtID) / vec3(size)) + PushConstants.uvwOffset.xyz;
     
-    float alpha = LightRay((uvw - 0.5) * 2.0, (PushConstants.lightDir).xyz);
+    float alpha = LightRay((uvw - 0.5) * 2.0, (normalize(PushConstants.lightDir).xyz));
     imageStore(lightingTex, dtID, vec4(alpha,0,0,0));
 }

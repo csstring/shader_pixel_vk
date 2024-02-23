@@ -16,7 +16,6 @@ const float s2 = s;
 const float Hr = 8e3; //Rayleigh scattering top //8e3
 const float Hm = 1.2e3; //Mie scattering top //1.3e3
 vec3 bM = vec3(21e-6); //normal mie // vec3(21e-6)
-
 //Rayleigh scattering (sky color, atmospheric up to 8km)
 vec3 bR = vec3(5.8e-6, 13.5e-6, 33.1e-6); //normal earth
 
@@ -26,6 +25,7 @@ layout(set = 0, binding = 0) uniform  SceneData{
 	vec4 sunlightColor;
 	vec4 viewPos;
     vec4 waterData; //a.time, b.WaterTurbulence c.WaterAbsorption d.color
+    vec4 cloudData; //cloud absortion, 
 } sceneData;
 
 layout(set = 1, binding = 1) uniform sampler3D densityTex;
@@ -72,7 +72,7 @@ vec4 CloudColor(vec3 dir)
     vec3 volumeAlbedo = vec3(1, 1, 1);
     vec4 color = vec4(0, 0, 0, 1);
     vec3 marchPosition = vec3(0.0f);
-    float cloudAbsorption = 8;//fix
+    float cloudAbsorption = sceneData.cloudData.x;//fix
     float contrastFactor = 0.8;
     for (int i =0; i < numSteps; ++i)
     {

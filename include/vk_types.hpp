@@ -78,7 +78,6 @@ enum class MaterialPass :uint8_t {
     MainColor,
     Transparent,
     World1_SkyBox,
-    SkySphere,
     Cloud,
     Reflect,
     StencilFill_Zero,
@@ -86,6 +85,8 @@ enum class MaterialPass :uint8_t {
     Offscreen,
     OffscreenBox,
     Julia,
+    CloudDensity,
+    CloudLighting,
     Other
 };
 
@@ -118,7 +119,10 @@ struct RenderObject {
 	glm::mat4 transform;
 };
 
-
+struct ComputeObject {
+  MaterialInstance material;
+  uint32_t dispatchX, dispatchY, dispatchZ;
+};
 
 struct alignas(16) GPUSceneData {
     glm::vec4 ambientColor;
@@ -126,6 +130,7 @@ struct alignas(16) GPUSceneData {
     glm::vec4 sunlightColor;// w for sun power
     glm::vec4 viewPos;
     glm::vec4 waterData;
+    glm::vec4 cloudData;
 };
 
 struct ComputeContext {
@@ -175,6 +180,7 @@ struct GPUDrawPushConstants {
   glm::mat4 worldMatrix;
   glm::mat4 view;
   glm::mat4 proj;
+  glm::mat4 normal;
 };
 
 class VulkanEngine;
@@ -195,35 +201,5 @@ struct DrawContext {
     std::vector<RenderObject> OpaqueSurfaces;
     std::vector<RenderObject> TransparentSurfaces;
     std::vector<RenderObject> EnvSurfaces;
-};
-
-class IRenderable {
-
-    virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
-};
-
-struct Node : public IRenderable {
-
-    // parent pointer must be a weak pointer to avoid circular dependencies
-    std::weak_ptr<Node> parent;
-    std::vector<std::shared_ptr<Node>> children;
-
-    glm::mat4 localTransform;
-    glm::mat4 worldTransform;
-
-    void refreshTransform(const glm::mat4& parentMatrix)
-    {
-        worldTransform = parentMatrix * localTransform;
-        for (auto c : children) {
-            c->refreshTransform(worldTransform);
-        }
-    }
-
-    virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx)
-    {
-        // draw children
-        for (auto& c : children) {
-            c->Draw(topMatrix, ctx);
-        }
-    }
+    std::vector<ComputeObject*> computeObj;
 };

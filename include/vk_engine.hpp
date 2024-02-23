@@ -10,62 +10,11 @@
 #include "Portal.hpp"
 #include "Cloud.hpp"
 #include "EnvOffscreenRender.hpp"
+#include "PSO.hpp"
+#include "GLTFMetallic.hpp"
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 class CloudScene;
-
-struct GLTFMetallic_Roughness {
-	MaterialPipeline opaquePipeline;
-	MaterialPipeline transparentPipeline;
-  MaterialPipeline world_skyBoxPipeline;
-
-  MaterialPipeline reflectPipeline;
-  MaterialPipeline stencilFill_Zero_Pipeline;
-  MaterialPipeline stencilFill_One_Pipeline;
-  MaterialPipeline cloudPipeline;
-  MaterialPipeline waterPipeline;
-  MaterialPipeline envPipeline;
-  MaterialPipeline juliaPipeline;
-
-	VkDescriptorSetLayout materialLayout;
-
-	struct MaterialConstants {
-		glm::vec4 colorFactors;
-		glm::vec4 metal_rough_factors;
-		//padding, we need it anyway for uniform buffers
-		glm::vec4 extra[14];
-	};
-
-	struct MaterialResources {
-		AllocatedImage colorImage;
-		VkSampler colorSampler;
-		AllocatedImage metalRoughImage;
-		VkSampler metalRoughSampler;
-    AllocatedImage skyBoxImage;
-		VkSampler skyBoxSampler;
-		VkBuffer dataBuffer;
-		uint32_t dataBufferOffset;
-	};
-
-	void build_pipelines(VulkanEngine* engine);
-  void buildWorldSkyBoxpipelines(VulkanEngine* engine);
-  void buildstencilFillpipelines(VulkanEngine* engine);
-  void build_cloudPipelines(VulkanEngine* engine);
-  void buildEnvOffscreenPipelines(VulkanEngine* engine);
-  void buildJuliapipelines(VulkanEngine* engine);
-  // void buildReflectpipelines(VulkanEngine* engine);
-  
-  DescriptorWriter writer;
-	MaterialInstance write_material(VulkanEngine* engine, MaterialPass pass, MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
-};
-
-struct MeshNode : public Node {
-
-	std::shared_ptr<MeshAsset> mesh;
-
-	virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
-};
-
 
 struct FrameData {
 	VkSemaphore _presentSemaphore, _renderSemaphore;
@@ -94,7 +43,7 @@ class VulkanEngine
     void init_scene();
     void load_meshes();
     void draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageIndex);
-    void draw_env(VkCommandBuffer cmd);
+    void computeCloud(VkCommandBuffer cmd);
     void init_descriptors();
     void init_imgui();
     void update_scene();
@@ -121,7 +70,6 @@ class VulkanEngine
     AllocatedImage createCubeImage(ktxTexture* ktxTexture, VkFormat format, VkSampler* sampler);
     
     Mesh* get_mesh(const std::string& name);
-    size_t pad_uniform_buffer_size(size_t originalSize);
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
     void destroy_buffer(const AllocatedBuffer& buffer);
@@ -155,43 +103,30 @@ class VulkanEngine
     VkRenderPass _renderPass;
 	  std::vector<VkFramebuffer> _framebuffers;
 
-    VkImageView _depthImageView;
-    VkFormat _depthFormat;
 	  AllocatedImage _depthImage;
 
-    std::vector<RenderObject> _renderables;
     std::unordered_map<std::string,Material> _materials;
     std::unordered_map<std::string,Mesh> _meshes;
     
     UploadContext _uploadContext;
-    std::unordered_map<std::string, Texture> _loadedTextures;
 
     DescriptorAllocatorGrowable globalDescriptorAllocator;
-  	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
-    DefualtPushConstants defualtConstants;
     GPUSceneData sceneData;
     VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
-    MaterialInstance defaultData;
-    GLTFMetallic_Roughness metalRoughMaterial;
+    GLTFMetallic metalRoughMaterial;
 
-    AllocatedImage _whiteImage;
-    AllocatedImage _blackImage;
-    AllocatedImage _greyImage;
     AllocatedImage _errorCheckerboardImage;
     AllocatedImage _vulkanBoxImage;
-    AllocatedImage _spaceBoxImage;
-    AllocatedImage _skySphereImage;
 
     VkSampler _defaultSamplerLinear;
-	  VkSampler _defaultSamplerNearest;
     VkSampler _vulkanBoxSamplerLinear;
-    VkSampler _spaceBoxSamplerLinear;
 
     DrawContext mainDrawContext;
     std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
     std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
-
+    std::unordered_map<std::string, std::shared_ptr<ComputeObject>> loadedComputeObj;
     Portal _portalManager;
     CloudScene* _cloud;
     EnvOffscreenRender* envRender;
+    PSO _PSO;
 };

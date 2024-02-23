@@ -21,20 +21,25 @@ layout( push_constant ) uniform constants
 	mat4 render_matrix;
 	mat4 view;
 	mat4 proj;
+	mat4 normal;
 } PushConstants;
 
 void main() 
 {
+	// outNormal = normalize(mat3(PushConstants.normal) * inNormal);
 	outNormal = inNormal;
-	outColor = inColor;
+	outColor = (materialData.colorFactors*vec4(inColor,1)).xyz;
 	outUV = inUV;
 	gl_Position =  PushConstants.proj * PushConstants.view * PushConstants.render_matrix * vec4(inPos, 1.0f);
 
-	vec4 pos = PushConstants.view * vec4(inPos, 1.0);
+	vec4 pos = PushConstants.render_matrix * vec4(inPos, 1.0);
 
-	outNormal = mat3(PushConstants.view) * inNormal;
-	vec3 lPos = mat3(PushConstants.view) * sceneData.sunlightDirection.xyz;
-	outLightVec = sceneData.sunlightDirection.xyz - pos.xyz;
-	outViewVec = sceneData.viewPos.xyz - pos.xyz;	
-
+	outLightVec = sceneData.sunlightDirection.xyz * sceneData.sunlightDirection.w;
+	outViewVec = sceneData.viewPos.xyz - pos.xyz;
+	// mat4 modelView = PushConstants.view * PushConstants.render_matrix;
+	// vec4 pos = modelView * vec4(inPos,1);	
+	// gl_Position = PushConstants.proj * pos;
+	// outViewVec = vec3(modelView * pos);
+	// vec4 lightPos = vec4(sceneData.sunlightDirection.xyz * sceneData.sunlightDirection.w, 1.0) * modelView;
+	// outLightVec = normalize(lightPos.xyz - outViewVec);
 }

@@ -6,6 +6,7 @@ layout(set = 0, binding = 0) uniform  SceneData{
 	vec4 sunlightColor;
 	vec4 viewPos;
   vec4 Data; //a.time, b.WaterTurbulence c.WaterAbsorption d.color
+  vec4 cloudData; //cloud absortion, anois, 
 } sceneData;
 
 layout(set = 1, binding = 0) uniform GLTFMaterialData{   
@@ -57,9 +58,8 @@ float map( in vec3 p, in vec3 c, out vec4 resColor )
     float b = 8.0*acos( clamp(z.y/r, -1.0, 1.0));
     float a = 8.0*atan( z.x, z.z );
     z = c + pow(r,10.0) * vec3( sin(b)*sin(a), cos(b), sin(b)*cos(a) );
-        
+      
     trap = min( trap, vec4(abs(z),m) );
-
     m = dot(z,z);
 		if( m > 2.0 )
       break;
@@ -87,7 +87,6 @@ float raycast( in vec3 ro, in vec3 rd, out vec4 rescol, float fov, vec3 c )
 		if( t>dis.y || dt<1e-3 ) break;
     t += min(dt,0.05);
   }
-    
     
   if( t<dis.y )
   {
@@ -117,7 +116,7 @@ void main( )
   vec3 rayOrigin = (invModel * sceneData.viewPos).xyz;
   vec3 rayDirection = normalize(inPos - rayOrigin);
 
-	vec3 light1 = sceneData.sunlightDirection.xyz;
+	vec3 light1 = normalize(sceneData.sunlightDirection.xyz);
 	vec3 light2 = sceneData.sunlightDirection.xyz;
   vec3 cc = vec3( sin(time * 1.7321/2.f), cos(time * 1.618), sin(time * 1.303) );
 	vec3 cc4 = vec3( 0.9*cos(3.9+1.2*time)-.3, 0.8*cos(2.5+1.1*time), 0.8*cos(3.4+1.3*time) );
@@ -133,31 +132,28 @@ void main( )
   
 	{
 		vec3 pos = rayOrigin + t*rayDirection;
-    vec3 nor =GetNormal(pos, cc);
+    vec3 nor = GetNormal(pos, cc);
     vec3 hal = normalize( light1-rayDirection);
-    vec3 ref = reflect( rayDirection, nor );
         
-    col = vec3(1.0,1.0,1.0)*0.3;
+    col = vec3(1.0,1.0,1.0)*0.1;
     col = mix( col, vec3(0.7,0.3,0.3), sqrt(tra.x) );
 		col = mix( col, vec3(1.0,0.5,0.2), sqrt(tra.y) );
 		col = mix( col, vec3(1.0,1.0,1.0), tra.z );
     col *= 0.4;
                 
 		float dif1 = clamp( dot( light1, nor ), 0.0, 1.0 );
-		float dif2 = clamp( 0.5 + 0.5*dot( light2, nor ), 0.0, 1.0 );
-    float occ = 1;
-    // float sha = softshadow( pos,light1, 0.0001, 32.0, cc );
-    float sha = 1;
+
+
     float fre = 0.04 + 0.96*pow( clamp(1.0-dot(-rayDirection,nor),0.0,1.0), 5.0 );
     float spe = pow( clamp(dot(nor,hal),0.0,1.0), 12.0 ) * dif1 * fre*8.0;
         
-		vec3 lin  = 1.0*vec3(0.15,0.20,0.23)*(0.6+0.4*nor.y)*(0.1+0.9*occ);
-		lin += 4.0*vec3(1.00,0.90,0.60)*dif1*sha;
-		lin += 4.0*vec3(0.14,0.14,0.14)*dif2*occ;
-    lin += 2.0*vec3(1.00,1.00,1.00)*spe*sha * occ;
-    lin += 0.3*vec3(0.20,0.30,0.40)*(0.02+0.98*occ);
+		vec3 lin  = 1.0*vec3(0.15,0.20,0.23)*(0.6+0.4*nor.y)*(0.1);
+		lin += 4.0*vec3(1.00,0.90,0.60)*dif1;
+
+    lin += 2.0*vec3(1.00,1.00,1.00)*spe;
+    lin += 0.3*vec3(0.20,0.30,0.40)*(0.02);
 		col *= lin;
-    col += spe*1.0*occ*sha;
+    col += spe;
 	}
 
 	col = sqrt( col );

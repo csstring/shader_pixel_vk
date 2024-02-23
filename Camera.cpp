@@ -29,7 +29,7 @@ void Camera::initialize(void)
     _yaw = -90.0;
     _pitch = 0.0f;
     _mouseSensitivity = 0.1f;
-    _movementSpeed = 0.2f;
+    _movementSpeed = 0.6f;
     _fov = 80.0f;
     _isFirst = true;
     _isOn = false;

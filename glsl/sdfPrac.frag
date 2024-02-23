@@ -69,6 +69,7 @@ layout(set = 0, binding = 0) uniform  SceneData{
 	vec4 sunlightColor;
 	vec4 viewPos;
     vec4 waterData; //a.time, b.WaterTurbulence c.WaterAbsorption d.color
+    vec4 cloudData; //cloud absortion, 
 } sceneData;
 
 layout(set = 1, binding = 0) uniform GLTFMaterialData{   
@@ -327,7 +328,7 @@ void GetSphere(int index, out vec3 origin, out float radius)
 
 float GetWaterWavesDisplacement(vec3 position, float time)
 {
-    return 4 * sin(position.x / 15.0 + time * 1.3) + 5 * cos(position.z / 150.0 + time / 1.1) +4;
+    return sceneData.waterData.w * sin(position.x / 15.0 + time * 1.3) + sceneData.waterData.w * cos(position.z / 150.0 + time / 1.1) +4;
 }
 
 float GetWaterNoise(vec3 position, float time)
@@ -538,7 +539,7 @@ float IntersectOpaqueScene(in vec3 rayOrigin, in vec3 rayDirection, out int obje
         PlaneIntersection(rayOrigin, rayDirection, vec3(0, GROUND_LEVEL, 0), vec3(0, 1, 0)),
         SAND_FLOOR_OBJECT_ID,
         objectID);
-    if (t > sceneData.waterData.w)
+    if (t > 100) //최대 시야 거리
         t = LARGE_NUMBER;
 //  충돌 체크는 되는데 계속 마지막 물 히트에 걸리네?
 

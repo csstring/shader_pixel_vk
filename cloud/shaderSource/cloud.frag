@@ -4,23 +4,20 @@ layout(set = 0, binding = 0) uniform  SceneData{
 	vec4 sunlightDirection; //w for sun power
 	vec4 sunlightColor;
 	vec4 viewPos;
+    vec4 waterData; //a.time, b.WaterTurbulence c.WaterAbsorption d.color
+    vec4 cloudData; //cloud absortion, aniso
 } sceneData;
+
 
 layout(set = 1, binding = 1) uniform sampler3D densityTex;
 layout(set = 1, binding = 2) uniform sampler3D lightingTex;
 layout(set = 1, binding = 3) uniform samplerCube skyBox;
 
-layout(push_constant) uniform Params {
-    mat4 render_matrix;
-    mat4 view;
+layout( push_constant ) uniform constants
+{
+	mat4 render_matrix;
+	mat4 view;
 	mat4 proj;
-    vec4 uvwOffset;
-    vec4 lightDir;
-    vec4 lightColor;
-    float lightAbsorptionCoeff;
-    float densityAbsorption;
-    float aniso;
-    float dt;
 } PushConstants;
 
 vec3 GetUVW(vec3 posModel) {
@@ -64,7 +61,7 @@ void main() {
     vec3 eyeModel = (worldInv * vec4(sceneData.viewPos)).xyz;
     vec3 dirModel = normalize(inPosModel - eyeModel);
 
-    int numSteps = 4;
+    int numSteps = 64;
     float stepSize = 2.0 / float(numSteps);
 
     vec3 volumeAlbedo = vec3(1, 1, 1);
@@ -75,21 +72,21 @@ void main() {
     for (int i = 0; i < numSteps; ++i) {
         vec3 uvw = GetUVW(posModel);
         float density = texture(densityTex, uvw).r;
-        float lighting = texture(lightingTex, uvw).r; // Or sample lightingTex if needed이거 강의 봐봐야야함
+        float lighting = texture(lightingTex, uvw).r; 
 
-        float sdf = sdSphere(posModel, 0.43);
+        // float sdf = sdSphere(posModel, 0.43);
 
-        if (sdf > 0.0f){
-            density *= clamp(1.0-sdf*9.0f, 0.0,1.0f);
-        }
+        // if (sdf > 0.0f){
+        //     density *= clamp(1.0-sdf*9.0f, 0.0,1.0f);
+        // }
         if (density > 1e-3) {
-            float prevAlpha = color.a;
-            color.a *= BeerLambert(PushConstants.densityAbsorption * density, stepSize);
-            float absorptionFromMarch = prevAlpha - color.a;
 
-            color.rgb += absorptionFromMarch * volumeAlbedo * PushConstants.lightColor.xyz
+            float prevAlpha = color.a;
+            color.a *= BeerLambert(sceneData.cloudData.x * density, stepSize);
+            float absorptionFromMarch = prevAlpha - color.a;
+            color.rgb += absorptionFromMarch * volumeAlbedo * (sceneData.sunlightColor.xyz * sceneData.sunlightColor.w)
                          * density * lighting
-                         * HenyeyGreensteinPhase(PushConstants.lightDir.xyz, dirModel, PushConstants.aniso);
+                         * HenyeyGreensteinPhase(normalize(sceneData.sunlightDirection.xyz), dirModel, sceneData.cloudData.y);
         }
 
         posModel += dirModel * stepSize;
@@ -104,4 +101,5 @@ void main() {
     color = clamp(color, 0.0, 1.0);
     color.a = 1.0 - color.a;
     outColor = color;
+    // outColor = vec4(1.0f);
 }

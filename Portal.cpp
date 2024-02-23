@@ -37,17 +37,18 @@ void Portal::update()
   beforeDir = cam._moveDir;
 }
 
-void Portal::initialize(glm::mat4 scale, glm::mat4 translate, PortalState state)
+void Portal::initialize(glm::mat4 scale, glm::mat4 rotation, glm::mat4 translate, PortalState state)
 {
   this->translate = translate;
   this->scale = scale;
   this->state = state;
-  xmin = (translate * scale * glm::vec4(-0.5,0,0,1)).x;
-  xmax = (translate * scale * glm::vec4(0.5,0,0,1)).x;
-  ymin = (translate * scale * glm::vec4(0,-0.5,0,1)).y;
-  ymax = (translate * scale * glm::vec4(0,0.5,0,1)).y;
-  zmin = (translate * glm::vec4(0,0,-0.5,1)).z;
-  zmax = (translate * glm::vec4(0,0,0.5,1)).z;
+  this->rot = rotation;
+  xmin = (translate * rotation * scale * glm::vec4(-0.5,0,0,1)).x;
+  xmax = (translate * rotation * scale * glm::vec4(0.5,0,0,1)).x;
+  ymin = (translate * rotation * scale * glm::vec4(0,-0.5,0,1)).y;
+  ymax = (translate * rotation * scale * glm::vec4(0,0.5,0,1)).y;
+  zmin = (translate * rotation * glm::vec4(0,0,-0.5,1)).z;
+  zmax = (translate * rotation * glm::vec4(0,0,0.5,1)).z;
   Camera& cam = Camera::getInstance();
   std::cout << "xmin : " << xmin << "xmax : " << xmax << "ymin : " << ymin << "ymax : " << ymax << "zmin : " << zmin << "zmax : " << zmax << std::endl;
   if (cam._cameraPos.x < xmin || cam._cameraPos.x > xmax 
