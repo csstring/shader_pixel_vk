@@ -39,7 +39,7 @@
 #define EPSILON 0.0001
 
 
-#define NUM_SPHERES 5
+#define NUM_SPHERES 10
 
 #define SAND_FLOOR_OBJECT_ID 0
 #define CORAL_ROCK_BASE_OBJECT_ID 1
@@ -311,15 +311,17 @@ struct Sphere
     vec3 origin;
     float radius;
 };
-    
+    //+-40 40 60~100
 void GetSphere(int index, out vec3 origin, out float radius)
 {
     Sphere spheres[NUM_SPHERES];
-    spheres[0] = Sphere(vec3(8, GROUND_LEVEL, 15), 6.0);
-    spheres[1] = Sphere(vec3(13, GROUND_LEVEL , 20), 7.5);
-    spheres[2] = Sphere(vec3(-5, GROUND_LEVEL , 5), 8.5);
-    spheres[3] = Sphere(vec3(-4, GROUND_LEVEL, 15), 8.0);
-    spheres[4] = Sphere(vec3(5, GROUND_LEVEL, 10), 8.0);
+    spheres[0] = Sphere(vec3(28, GROUND_LEVEL, 70), 12.0);
+    spheres[1] = Sphere(vec3(13, GROUND_LEVEL , 75), 13.5);
+    spheres[2] = Sphere(vec3(-25, GROUND_LEVEL , 80), 14.5);
+    spheres[3] = Sphere(vec3(-24, GROUND_LEVEL, 85), 15.0);
+    spheres[4] = Sphere(vec3(15, GROUND_LEVEL, 90), 13.0);
+
+
 
     origin = spheres[index].origin;
     radius = spheres[index].radius;

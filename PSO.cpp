@@ -229,7 +229,7 @@ void PSO::buildJuliapipelines(VulkanEngine* engine, GLTFMetallic* metallic)
 	VkPipelineLayout newLayout;
 	VK_CHECK(vkCreatePipelineLayout(engine->_device, &skybox_layout_info, nullptr, &newLayout));
 
-  juliaPipeline.layout = newLayout;
+  	juliaPipeline.layout = newLayout;
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 	PipelineBuilder pipelineBuilder;
 	pipelineBuilder.loadShader("./spv/julia.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
@@ -253,7 +253,7 @@ void PSO::buildJuliapipelines(VulkanEngine* engine, GLTFMetallic* metallic)
 	pipelineBuilder._depthStencil.back.passOp = VK_STENCIL_OP_KEEP;
 	pipelineBuilder._depthStencil.front = pipelineBuilder._depthStencil.back;
 
-  juliaPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
+  	juliaPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 	pipelineBuilder.shaderFlush(engine->_device);
 
 	engine->_mainDeletionQueue.push_function([=]() {
@@ -282,8 +282,8 @@ void PSO::build_pipelines(VulkanEngine* engine, GLTFMetallic* metallic)
 	VkPipelineLayout newLayout;
 	VK_CHECK(vkCreatePipelineLayout(engine->_device, &mesh_layout_info, nullptr, &newLayout));
 
-  waterPipeline.layout = newLayout;
-  transparentPipeline.layout = newLayout;
+  	waterPipeline.layout = newLayout;
+  	transparentPipeline.layout = newLayout;
 	opaquePipeline.layout = newLayout;
 
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
@@ -308,12 +308,14 @@ void PSO::build_pipelines(VulkanEngine* engine, GLTFMetallic* metallic)
 	pipelineBuilder._depthStencil.back.depthFailOp = VK_STENCIL_OP_KEEP;
 	pipelineBuilder._depthStencil.back.passOp = VK_STENCIL_OP_KEEP;
 	pipelineBuilder._depthStencil.front = pipelineBuilder._depthStencil.back;
-  waterPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
+  	waterPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 	pipelineBuilder.shaderFlush(engine->_device);
 
 	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
 	pipelineBuilder.loadShader("./spv/mesh.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
 	pipelineBuilder.loadShader("./spv/mesh.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	pipelineBuilder._depthStencil.back.reference = 1;
+	pipelineBuilder._depthStencil.front = pipelineBuilder._depthStencil.back;
 	opaquePipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 
 	pipelineBuilder._colorBlendAttachment = vkinit::enable_blending_additive();

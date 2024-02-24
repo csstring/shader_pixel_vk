@@ -10,7 +10,7 @@ void CloudScene::guiRender()
 {
   ImGui::Begin("cloud controller");
 	ImGui::SliderFloat("lightAbsorptionCoeff", &constants.lightAbsorptionCoeff, 0, 100);
-	ImGui::SliderFloat("densityAbsorption", &constants.densityAbsorption, 0, 2);
+	ImGui::SliderFloat("densityAbsorption", &constants.densityAbsorption, 0, 100);
 	ImGui::SliderFloat("aniso", &constants.aniso, 0, 2);
 	ImGui::SliderFloat3("lightDir", &constants.lightDir.x, -1, 1);
 	ImGui::SliderFloat3("lightColor", &constants.lightColor.x, 0, 255);
