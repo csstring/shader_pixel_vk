@@ -49,7 +49,7 @@ void VulkanEngine::init()
 	init_descriptors();
 	_cloud = new CloudScene();
 	_cloud->initialize(this);
-  init_pipelines();
+  	init_pipelines();
 	load_meshes();
 	loadCubeMap(this, "./assets/textures/", "cubemap_vulkan.ktx", VK_FORMAT_R8G8B8A8_UNORM, &_vulkanBoxSamplerLinear, &_vulkanBoxImage);
 
@@ -1184,13 +1184,13 @@ void VulkanEngine::update_scene()
 	mainDrawContext.EnvSurfaces.clear();
 	mainDrawContext.computeObj.clear();
 
-	_portalManager.update();
+	// _portalManager.update();
 	glm::mat4 s = glm::translate(glm::vec3(0, 40, 0 )) *glm::rotate(-80.0f, glm::vec3(1,0,0))*glm::scale(glm::mat4(1.0f), glm::vec3(250.0f));
 
 	glm::mat4 sandTransForm = glm::translate(glm::vec3(0, -40, -0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(200.0f));
 	glm::mat4 sprTransForm = glm::translate(glm::vec3(0, 40, -100 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
 
-
+	glm::mat4 sandTransForm1 = glm::translate(glm::vec3(0, -40, -20 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
 	switch (_portalManager.getPortalState())
 	{
 	case PortalState::In_World0:
@@ -1207,8 +1207,8 @@ void VulkanEngine::update_scene()
 	loadedScenes["vulkanmodels"]->Draw(sprTransForm ,mainDrawContext);
 	loadedScenes["vulkanscenelogos"]->Draw(sprTransForm ,mainDrawContext);
 	loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
-	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // main
-
+	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // cloudCube
+	// loadedScenes["cloudCube"]->Draw(sandTransForm1, mainDrawContext);
 	mainDrawContext.computeObj.push_back(loadedComputeObj["cloudDensity"].get());
 	mainDrawContext.computeObj.push_back(loadedComputeObj["cloudLighting"].get());
 
@@ -1225,4 +1225,3 @@ void VulkanEngine::destroy_image(const AllocatedImage& img)
   vkDestroyImageView(_device, img._imageView, nullptr);
   vmaDestroyImage(_allocator, img._image, img._allocation);
 }
-

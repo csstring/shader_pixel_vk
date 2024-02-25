@@ -74,11 +74,11 @@ void main() {
         float density = texture(densityTex, uvw).r;
         float lighting = texture(lightingTex, uvw).r; 
 
-        // float sdf = sdSphere(posModel, 0.43);
+        float sdf = sdSphere(posModel, 0.74);
 
-        // if (sdf > 0.0f){
-        //     density *= clamp(1.0-sdf*9.0f, 0.0,1.0f);
-        // }
+        if (sdf > 0.0f){
+            density *= clamp(1.0-sdf*9.0f, 0.0,1.0f);
+        }
         if (density > 1e-3) {
 
             float prevAlpha = color.a;

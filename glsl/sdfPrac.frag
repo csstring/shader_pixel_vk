@@ -883,7 +883,6 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
                 sceneData.waterData.x,
                 (firstEntry ? SCENE_TYPE_OCEAN : SCENE_TYPE_SIMPLIFIED_OCEAN),
                 intersectFound);
-        // if (!intersectFound && t == LARGE_NUMBER) discard;
         if(!intersectFound && entry == 0 && t == LARGE_NUMBER) return GetSkyColor(rayDirection);
         if (!intersectFound) break;
 		else

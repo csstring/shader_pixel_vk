@@ -79,7 +79,7 @@ vec4 CloudColor(vec3 dir)
         vec3 uvw = GetUVW(marchPosition);
         float density = texture(densityTex, uvw).r;
         float lighting = texture(lightingTex, uvw).r;
-        density = pow(density, contrastFactor);
+        // density = pow(density, contrastFactor);
         if (density > 1e-3){
             float prevAlpha = color.a;
             color.a *= BeerLambert1(cloudAbsorption * density, stepSize);
