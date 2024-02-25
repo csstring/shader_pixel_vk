@@ -1191,21 +1191,21 @@ void VulkanEngine::update_scene()
 	glm::mat4 sprTransForm = glm::translate(glm::vec3(0, 40, -100 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
 
 	glm::mat4 sandTransForm1 = glm::translate(glm::vec3(0, -40, -20 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
-	switch (_portalManager.getPortalState())
-	{
-	case PortalState::In_World0:
-		loadedScenes["StencilFill_One"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
-		break;
-	case PortalState::In_World1:
-		loadedScenes["StencilFill_Zero"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
-		// loadedScenes["julia"]->Draw(glm::scale(glm::mat4(1.0f), glm::vec3(40.0f)) ,mainDrawContext);
-		break;
-	default:
-		break;
-	}
-	loadedScenes["World1_SkyBox"]->Draw(s, mainDrawContext);
-	loadedScenes["vulkanmodels"]->Draw(sprTransForm ,mainDrawContext);
-	loadedScenes["vulkanscenelogos"]->Draw(sprTransForm ,mainDrawContext);
+	// switch (_portalManager.getPortalState())
+	// {
+	// case PortalState::In_World0:
+	// 	loadedScenes["StencilFill_One"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
+	// 	break;
+	// case PortalState::In_World1:
+	// 	loadedScenes["StencilFill_Zero"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
+	// 	// loadedScenes["julia"]->Draw(glm::scale(glm::mat4(1.0f), glm::vec3(40.0f)) ,mainDrawContext);
+	// 	break;
+	// default:
+	// 	break;
+	// }
+	// loadedScenes["World1_SkyBox"]->Draw(s, mainDrawContext);
+	// loadedScenes["vulkanmodels"]->Draw(sprTransForm ,mainDrawContext);
+	// loadedScenes["vulkanscenelogos"]->Draw(sprTransForm ,mainDrawContext);
 	loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
 	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // cloudCube
 	// loadedScenes["cloudCube"]->Draw(sandTransForm1, mainDrawContext);

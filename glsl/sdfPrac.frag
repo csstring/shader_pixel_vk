@@ -761,7 +761,7 @@ vec3 GetSkyColor(in vec3 rayDirection)
     if (rayDirection.y < 0.02) rayDirection.y = 0.02;
     return texture(skyBox, (rayDirection)).xyz;
 }
-
+//Schlick's approximation
 float FresnelFactor(
     float CurrentIOR,
     float NewIOR,
@@ -772,7 +772,7 @@ float FresnelFactor(
         ((CurrentIOR - NewIOR) / (CurrentIOR + NewIOR)) *
         ((CurrentIOR - NewIOR) / (CurrentIOR + NewIOR));
     return 
-        clamp(ReflectionCoefficient + (1.0 - ReflectionCoefficient) * pow(1.0 - dot(Normal, -RayDirection), 5.0), MIN_REFLECTION_COEFFECIENT, 1.0); 
+        clamp(ReflectionCoefficient + (1.0 - ReflectionCoefficient) * pow(1.0 - dot(Normal, -RayDirection), 5.0), MIN_REFLECTION_COEFFECIENT, 1.0);
 }
 
 vec3 SandParallaxOcclusionMapping(vec3 position, vec3 view)
