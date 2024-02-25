@@ -998,7 +998,7 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
                     break;
                 }
             }
-
+// 여기 부부터  다다시
             if(intersectFound && outsideVolume)
             {
                 // Flip the normal since we're coming from inside the volume
