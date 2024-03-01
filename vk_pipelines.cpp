@@ -114,3 +114,22 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device, VkRenderPass pass)
 	}
 }
 
+VkPipeline PipelineBuilder::build_compute_pipeline(VkDevice device)
+{
+    VkComputePipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	pipelineInfo.pNext = nullptr;
+	pipelineInfo.stage = _shaderStages.front();
+	pipelineInfo.layout = _pipelineLayout;
+
+    VkPipeline newPipeline;
+	if (vkCreateComputePipelines(
+		device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS) {
+		std::cout << "failed to create pipeline\n";
+		return VK_NULL_HANDLE; // failed to create graphics pipeline
+	}
+	else
+	{
+		return newPipeline;
+	}
+}

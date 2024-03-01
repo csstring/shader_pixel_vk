@@ -39,7 +39,7 @@
 #define EPSILON 0.0001
 
 
-#define NUM_SPHERES 5
+#define NUM_SPHERES 10
 
 #define SAND_FLOOR_OBJECT_ID 0
 #define CORAL_ROCK_BASE_OBJECT_ID 1
@@ -69,6 +69,7 @@ layout(set = 0, binding = 0) uniform  SceneData{
 	vec4 sunlightColor;
 	vec4 viewPos;
     vec4 waterData; //a.time, b.WaterTurbulence c.WaterAbsorption d.color
+    vec4 cloudData; //cloud absortion, 
 } sceneData;
 
 layout(set = 1, binding = 0) uniform GLTFMaterialData{   
@@ -310,15 +311,17 @@ struct Sphere
     vec3 origin;
     float radius;
 };
-    
+    //+-40 40 60~100
 void GetSphere(int index, out vec3 origin, out float radius)
 {
     Sphere spheres[NUM_SPHERES];
-    spheres[0] = Sphere(vec3(8, GROUND_LEVEL, 15), 6.0);
-    spheres[1] = Sphere(vec3(13, GROUND_LEVEL , 20), 7.5);
-    spheres[2] = Sphere(vec3(-5, GROUND_LEVEL , 5), 8.5);
-    spheres[3] = Sphere(vec3(-4, GROUND_LEVEL, 15), 8.0);
-    spheres[4] = Sphere(vec3(5, GROUND_LEVEL, 10), 8.0);
+    spheres[0] = Sphere(vec3(28, GROUND_LEVEL, 70), 12.0);
+    spheres[1] = Sphere(vec3(13, GROUND_LEVEL , 75), 13.5);
+    spheres[2] = Sphere(vec3(-25, GROUND_LEVEL , 80), 14.5);
+    spheres[3] = Sphere(vec3(-24, GROUND_LEVEL, 85), 15.0);
+    spheres[4] = Sphere(vec3(15, GROUND_LEVEL, 90), 13.0);
+
+
 
     origin = spheres[index].origin;
     radius = spheres[index].radius;
@@ -327,7 +330,7 @@ void GetSphere(int index, out vec3 origin, out float radius)
 
 float GetWaterWavesDisplacement(vec3 position, float time)
 {
-    return 0 * sin(position.x / 15.0 + time * 1.3) + 0 * cos(position.z / 150.0 + time / 1.1) +4;
+    return sceneData.waterData.w * sin(position.x / 15.0 + time * 1.3) + sceneData.waterData.w * cos(position.z / 150.0 + time / 1.1) +4;
 }
 
 float GetWaterNoise(vec3 position, float time)
@@ -538,7 +541,7 @@ float IntersectOpaqueScene(in vec3 rayOrigin, in vec3 rayDirection, out int obje
         PlaneIntersection(rayOrigin, rayDirection, vec3(0, GROUND_LEVEL, 0), vec3(0, 1, 0)),
         SAND_FLOOR_OBJECT_ID,
         objectID);
-    if (t > sceneData.waterData.w)
+    if (t > 100) //최대 시야 거리
         t = LARGE_NUMBER;
 //  충돌 체크는 되는데 계속 마지막 물 히트에 걸리네?
 
@@ -650,10 +653,6 @@ float smoothVoronoi( in vec2 x )
 vec3 GetBaseSkyColor(vec3 rayDirection)
 {
     return scatter(vec3(0,sceneData.viewPos.y,0), rayDirection);
-	// return mix(
-    //     vec3(0.2, 0.5, 0.8),
-    //     vec3(0.7, 0.75, 0.9),
-    //      max(rayDirection.y, 0.0));
 }
 
 vec3 GetAmbientSkyColor()
@@ -754,14 +753,15 @@ vec4 GetCloudColor(vec3 position)
 
 vec3 GetSkyColor(in vec3 rayDirection)
 {
-    vec3 skyColor = GetBaseSkyColor(rayDirection);
-    // vec4 cloudColor = GetCloudColor(rayDirection*4.0f );
-    vec4 cloudColor = CloudColor(rayDirection );
-    skyColor = mix(skyColor, cloudColor.rgb, cloudColor.a);
+    // vec3 skyColor = GetBaseSkyColor(rayDirection);
+    // vec4 cloudColor = CloudColor(rayDirection );
+    // skyColor = mix(skyColor, cloudColor.rgb, cloudColor.a);
 
-    return skyColor.xyz;
+    // return skyColor.xyz;
+    if (rayDirection.y < 0.02) rayDirection.y = 0.02;
+    return texture(skyBox, (rayDirection)).xyz;
 }
-
+//Schlick's approximation
 float FresnelFactor(
     float CurrentIOR,
     float NewIOR,
@@ -772,7 +772,7 @@ float FresnelFactor(
         ((CurrentIOR - NewIOR) / (CurrentIOR + NewIOR)) *
         ((CurrentIOR - NewIOR) / (CurrentIOR + NewIOR));
     return 
-        clamp(ReflectionCoefficient + (1.0 - ReflectionCoefficient) * pow(1.0 - dot(Normal, -RayDirection), 5.0), MIN_REFLECTION_COEFFECIENT, 1.0); 
+        clamp(ReflectionCoefficient + (1.0 - ReflectionCoefficient) * pow(1.0 - dot(Normal, -RayDirection), 5.0), MIN_REFLECTION_COEFFECIENT, 1.0);
 }
 
 vec3 SandParallaxOcclusionMapping(vec3 position, vec3 view)
@@ -883,7 +883,6 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
                 sceneData.waterData.x,
                 (firstEntry ? SCENE_TYPE_OCEAN : SCENE_TYPE_SIMPLIFIED_OCEAN),
                 intersectFound);
-        // if (!intersectFound && t == LARGE_NUMBER) discard;
         if(!intersectFound && entry == 0 && t == LARGE_NUMBER) return GetSkyColor(rayDirection);
         if (!intersectFound) break;
 		else
@@ -999,7 +998,7 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
                     break;
                 }
             }
-
+// 여기 부부터  다다시
             if(intersectFound && outsideVolume)
             {
                 // Flip the normal since we're coming from inside the volume
@@ -1070,60 +1069,6 @@ vec3 Render( in vec3 rayOrigin, in vec3 rayDirection)
     // return opaqueColor;
     return accumulatedColor + accumulatedColorMultiplier * opaqueColor;
 }
-
-// mat3 GetViewMatrix(float xRotationFactor)
-// { 
-//    float xRotation = ((1.0 - xRotationFactor) - 0.5) * PI * 0.2;
-//    return mat3( cos(xRotation), 0.0, sin(xRotation),
-//                 0.0,           1.0, 0.0,    
-//                 -sin(xRotation),0.0, cos(xRotation));
-// }
-
-// float GetRotationFactor()
-// {
-//     return iMouse.x / iResolution.x;
-// }
-
-// bool IsInputThread(in vec2 fragCoord)
-// {
-//     return ALLOW_KEYBOARD_INPUT != 0 && int(fragCoord.x) == 0 && int(fragCoord.y) == 0;
-// }
-   
-
-// bool KeyDown(int char)
-// {
-//     return int(texelFetch(iChannel1, ivec2(char, 0), 0).x) > 0;
-// }
-
-// void ProcessInput()
-// {
-//     const float WaterIorChangeRate = 0.35;
-// 	if(KeyDown(87)) WaterIor += WaterIorChangeRate * iTimeDelta;
-//     if(KeyDown(83)) WaterIor -= WaterIorChangeRate * iTimeDelta;
-//     WaterIor = clamp(WaterIor, 1.0, 1.8);
-    
-//     const float WaterTurbulanceChangeRate = 7.0;
-// 	if(KeyDown(69)) WaterTurbulence += WaterTurbulanceChangeRate * iTimeDelta;
-//     if(KeyDown(68)) WaterTurbulence -= WaterTurbulanceChangeRate * iTimeDelta;
-//     WaterTurbulence = clamp(WaterTurbulence, 0.0, 50.0);
-       
-//     const float WaterAbsorptionChangeRate = 0.03;
-// 	if(KeyDown(81)) WaterAbsorption += WaterAbsorptionChangeRate * iTimeDelta;
-//     if(KeyDown(65)) WaterAbsorption -= WaterAbsorptionChangeRate * iTimeDelta;
-//     WaterAbsorption = clamp(WaterAbsorption, 0.0, 1.0);
-    
-//     const float ColorChangeRate = 0.5;
-// 	if(KeyDown(89)) WaterColor.r += ColorChangeRate * iTimeDelta;
-//     if(KeyDown(72)) WaterColor.r -= ColorChangeRate * iTimeDelta;
-    
-//     if(KeyDown(85)) WaterColor.g += ColorChangeRate * iTimeDelta;
-//     if(KeyDown(74)) WaterColor.g -= ColorChangeRate * iTimeDelta;
-    
-//     if(KeyDown(73)) WaterColor.b += ColorChangeRate * iTimeDelta;
-//     if(KeyDown(75)) WaterColor.b -= ColorChangeRate * iTimeDelta;
-    
-//     WaterColor = clamp(WaterColor, 0.05, 0.99);
-// }
 
 float EncodeWaterColor()
 {

@@ -4,6 +4,7 @@ layout(set = 0, binding = 0) uniform  SceneData{
 	vec4 sunlightColor;
 	vec4 viewPos;
   vec4 waterData; //a.time, b.WaterTurbulence c.WaterAbsorption d.color
+  vec4 cloudData; //cloud absortion, 
 } sceneData;
 
 layout(set = 1, binding = 0) uniform GLTFMaterialData{   

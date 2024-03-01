@@ -21,6 +21,7 @@ class PipelineBuilder {
     VkViewport _viewport;
     VkRect2D _scissor;
     VkPipeline build_pipeline(VkDevice device, VkRenderPass pass);
+    VkPipeline build_compute_pipeline(VkDevice device);
     void loadShader(std::string ShaderPath, VkDevice device, VkShaderStageFlagBits shaderStage);
     void shaderFlush(VkDevice device);
 };

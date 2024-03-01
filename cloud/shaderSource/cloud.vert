@@ -15,19 +15,16 @@ layout(set = 0, binding = 0) uniform  SceneData{
 	vec4 sunlightDirection; //w for sun power
 	vec4 sunlightColor;
 	vec4 viewPos;
+  vec4 waterData; //a.time, b.WaterTurbulence c.WaterAbsorption d.color
+  vec4 cloudData; //cloud absortion, 
 } sceneData;
 
-layout(push_constant) uniform Params {
-    mat4 render_matrix;
-    mat4 view;
-		mat4 proj;
-    vec4 uvwOffset;
-    vec4 lightDir;
-    vec4 lightColor;
-    float lightAbsorptionCoeff;
-    float densityAbsorption;
-    float aniso;
-    float dt;
+
+layout( push_constant ) uniform constants
+{
+	mat4 render_matrix;
+	mat4 view;
+	mat4 proj;
 } PushConstants;
 
 void main()

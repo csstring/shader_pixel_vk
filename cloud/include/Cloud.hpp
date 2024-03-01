@@ -15,8 +15,6 @@ class CloudScene
     DeletionQueue _deletionQueue;
     ComputeContext _computeContext;
 
-
-
     void makeLightTexture();
     void genCloud();
 
@@ -24,13 +22,19 @@ class CloudScene
     void initGenCloudPipelines();
     void initMakeLightTexturePipelines();
 
+    glm::vec4 rot;
+
+  public:
     uint32_t dispatchSize = 4;
     uint32_t imageWidth = 128;
     uint32_t imageHeight = 128;
     uint32_t imageDepth = 128;
-    glm::vec4 rot;
+    VkDescriptorSetLayout cloudDensityLayout;
+    VkDescriptorSetLayout cloudLightingLayout;
 
-  public:
+    VkDescriptorSet cloudDensityDescriptor;
+    VkDescriptorSet cloudLightingDescriptor;
+
     VkSampler _defaultSamplerLinear;
     VkSampler _defualtSamplerNear;
     glm::vec3 modelTrans;

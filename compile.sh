@@ -13,6 +13,12 @@
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/stencilFill.vert -o ./spv/stencilFill.vert.spv
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/stencilFill.frag -o ./spv/stencilFill.frag.spv
 
+/Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/offscreen.vert -o ./spv/offscreen.vert.spv
+/Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/offscreen.frag -o ./spv/offscreen.frag.spv
+
+/Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/julia.vert -o ./spv/julia.vert.spv
+/Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/julia.frag -o ./spv/julia.frag.spv
+
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./cloud/shaderSource/cloudDensity.comp -o ./spv/cloudDensity.comp.spv
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./cloud/shaderSource/cloudLighting.comp -o ./spv/cloudLighting.comp.spv
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./cloud/shaderSource/cloud.vert -o ./spv/cloud.vert.spv

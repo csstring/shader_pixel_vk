@@ -10,6 +10,7 @@
 #include "glm_element_traits.hpp"
 #include "parser.hpp"
 #include "tools.hpp"
+#include "GLTFMetallic.hpp"
 
 std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath)
 {
@@ -318,7 +319,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
         if (img.has_value()) {
             images.push_back(*img);
             file.images.push_back(*img);
-
+            std::cout << "gltf success to load texture " << image.name << std::endl;
         } else {
             // we failed to load, so lets give the slot a default white texture to not
             // completely break loading
@@ -330,16 +331,16 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
     // create buffer to hold the material data
     if (gltf.materials.size()){
         file.descriptorPool.init(engine->_device, gltf.materials.size(), sizes);
-        file.materialDataBuffer = engine->create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants) * gltf.materials.size(),
+        file.materialDataBuffer = engine->create_buffer(sizeof(GLTFMetallic::MaterialConstants) * gltf.materials.size(),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
         int data_index = 0;
-        GLTFMetallic_Roughness::MaterialConstants* sceneMaterialConstants = (GLTFMetallic_Roughness::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
+        GLTFMetallic::MaterialConstants* sceneMaterialConstants = (GLTFMetallic::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
         for (fastgltf::Material& mat : gltf.materials) {
             std::shared_ptr<GLTFMaterial> newMat = std::make_shared<GLTFMaterial>();
             materials.push_back(newMat);
             file.materials[mat.name.c_str()] = newMat;
 
-            GLTFMetallic_Roughness::MaterialConstants constants;
+            GLTFMetallic::MaterialConstants constants;
             constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
             constants.colorFactors.y = mat.pbrData.baseColorFactor[1];
             constants.colorFactors.z = mat.pbrData.baseColorFactor[2];
@@ -353,7 +354,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
             // if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
             //     passType = MaterialPass::Transparent;
             // }
-            GLTFMetallic_Roughness::MaterialResources materialResources;
+            GLTFMetallic::MaterialResources materialResources;
             // default the material textures
             // materialResources.colorImage = engine->_errorCheckerboardImage;
             // materialResources.colorSampler = engine->_defaultSamplerLinear;
@@ -368,18 +369,22 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
             materialResources.metalRoughImage = engine->_errorCheckerboardImage;
             materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
             materialResources.dataBuffer = file.materialDataBuffer.buffer;
-            materialResources.dataBufferOffset = data_index * sizeof(GLTFMetallic_Roughness::MaterialConstants);
+            materialResources.dataBufferOffset = data_index * sizeof(GLTFMetallic::MaterialConstants);
             // grab textures from gltf file
 
             if (mat.pbrData.baseColorTexture.has_value()) {
                 auto& baseColorTexture = mat.pbrData.baseColorTexture.value();
+                std::cerr <<"baseColorTexture" << std::endl;
                 if (baseColorTexture.textureIndex < gltf.textures.size()) {
                     auto& texture = gltf.textures[baseColorTexture.textureIndex];
+                    std::cerr <<"textureIndex" << std::endl;
                     if (texture.imageIndex.has_value() && texture.imageIndex.value() < images.size()) {
                         materialResources.colorImage = images[texture.imageIndex.value()];
+                        std::cerr <<"imageIndex" << std::endl;
                     }
                     if (texture.samplerIndex.has_value() && texture.samplerIndex.value() < file.samplers.size()) {
                         materialResources.colorSampler = file.samplers[texture.samplerIndex.value()];
+                        std::cerr <<"samplerIndex" << std::endl;
                     }
                 }
             }
@@ -390,20 +395,20 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
         }
     } else {
         file.descriptorPool.init(engine->_device, 1, sizes);
-        file.materialDataBuffer = engine->create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants) * 1,
+        file.materialDataBuffer = engine->create_buffer(sizeof(GLTFMetallic::MaterialConstants) * 1,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        GLTFMetallic_Roughness::MaterialConstants* sceneMaterialConstants = (GLTFMetallic_Roughness::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
+        GLTFMetallic::MaterialConstants* sceneMaterialConstants = (GLTFMetallic::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
 
         std::shared_ptr<GLTFMaterial> newMat = std::make_shared<GLTFMaterial>();
         materials.push_back(newMat);
         file.materials["emptyMat"] = newMat;
 
-        GLTFMetallic_Roughness::MaterialConstants constants;
+        GLTFMetallic::MaterialConstants constants;
         constants.colorFactors = glm::vec4(1.0f);
         constants.metal_rough_factors = glm::vec4(0.0f);
         sceneMaterialConstants[0] = constants;
         std::cerr << "empty" << std::endl;
-        GLTFMetallic_Roughness::MaterialResources materialResources;
+        GLTFMetallic::MaterialResources materialResources;
         // default the material textures
         materialResources.colorImage = engine->_errorCheckerboardImage;
         materialResources.colorSampler = engine->_defaultSamplerLinear;
@@ -494,6 +499,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
                 fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, gltf.accessors[(*colors).second],
                     [&](glm::vec4 v, size_t index) {
                         vertices[initial_vtx + index].color = v;
+                        if (passType == MaterialPass::Transparent)
+                            std::cout << glm::to_string(v) << std::endl;
                     });
             }
 
@@ -617,10 +624,6 @@ void loadKtxTexture(VulkanEngine* engine, std::string dirPath, std::string fileN
     size.width = ktxTexture->baseWidth;
     size.height = ktxTexture->baseHeight;
 	size.depth = 1;
-    std::cout << size.width << std::endl;
-    std::cout << size.height << std::endl;
-    std::cout << size.depth << std::endl;
-    std::cout << ktxTextureSize << std::endl;
     *newImage = engine->create_image((void*)ktxTextureData, size,format,VK_IMAGE_USAGE_SAMPLED_BIT );
     engine->_mainDeletionQueue.push_function([=]() {
         engine->destroy_image(*newImage);
@@ -655,4 +658,36 @@ void LoadedGLTF::clearAll()
     creator->destroy_buffer(materialDataBuffer);
 
     descriptorPool.destroy_pools(dv);
+}
+
+std::optional<std::shared_ptr<ComputeObject>> loadComputeObj(VulkanEngine* engine, MaterialPass passType)
+{
+    std::shared_ptr<ComputeObject> obj = std::make_shared<ComputeObject>();
+    MaterialInstance matData;
+    DescriptorWriter writer;
+	matData.passType = passType;
+    obj->dispatchX = engine->_cloud->imageWidth / engine->_cloud->dispatchSize;
+    obj->dispatchY = engine->_cloud->imageHeight / engine->_cloud->dispatchSize;
+    obj->dispatchZ = engine->_cloud->imageDepth / engine->_cloud->dispatchSize;
+    switch (passType)
+    {
+        case MaterialPass::CloudDensity:
+        matData.materialSet = engine->_cloud->cloudDensityDescriptor;
+        matData.pipeline = &engine->_PSO.cloudDensityPipeline;
+        writer.write_image(0, engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, nullptr , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        writer.update_set(engine->_device, matData.materialSet);
+        break;
+        case MaterialPass::CloudLighting:
+        matData.materialSet = engine->_cloud->cloudLightingDescriptor;
+        matData.pipeline = &engine->_PSO.cloudLightingPipeline;
+        writer.write_image(0, engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, engine->_defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.write_image(1, engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, nullptr , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        writer.update_set(engine->_device, matData.materialSet);
+        break;
+        default:
+        std::cerr << "switch fail" << std::endl;
+		break;
+    }
+    obj->material = matData;
+    return obj;
 }

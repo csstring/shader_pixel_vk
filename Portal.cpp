@@ -15,21 +15,21 @@ void Portal::update()
     return;
   }
   CAMERA_MOVE_DIR curDir = cam._moveDir == CAMERA_MOVE_DIR::MOVE_STOP ? beforeDir : cam._moveDir;
-  state = state == PortalState::In_World1 ? PortalState::In_World2 : PortalState::In_World1;
+  state = state == PortalState::In_World0 ? PortalState::In_World1 : PortalState::In_World0;
   switch (curDir)
   {
     // std::cout << glm::to_string(cam._cameraFront) << std::endl;
     case CAMERA_MOVE_DIR::MOVE_W:
-        cam._cameraPos += cam._cameraFront * 3.f;
+        cam._cameraPos += cam._cameraFront * 4.f;
         break;
     case CAMERA_MOVE_DIR::MOVE_S:
-        cam._cameraPos -= cam._cameraFront * 3.f;
+        cam._cameraPos -= cam._cameraFront * 4.f;
         break;
     case CAMERA_MOVE_DIR::MOVE_A:
-        cam._cameraPos -= cam._cameraRight * 3.f;
+        cam._cameraPos -= cam._cameraRight * 4.f;
         break;
     case CAMERA_MOVE_DIR::MOVE_D:
-        cam._cameraPos += cam._cameraRight * 3.f;
+        cam._cameraPos += cam._cameraRight * 4.f;
         break;    
     default:
         break;
@@ -37,17 +37,18 @@ void Portal::update()
   beforeDir = cam._moveDir;
 }
 
-void Portal::initialize(glm::mat4 scale, glm::mat4 translate, PortalState state)
+void Portal::initialize(glm::mat4 scale, glm::mat4 rotation, glm::mat4 translate, PortalState state)
 {
   this->translate = translate;
   this->scale = scale;
   this->state = state;
-  xmin = (scale * translate * glm::vec4(-0.5,0,0,1)).x;
-  xmax = (scale * translate * glm::vec4(0.5,0,0,1)).x;
-  ymin = (scale * translate * glm::vec4(0,-0.5,0,1)).y;
-  ymax = (scale * translate * glm::vec4(0,0.5,0,1)).y;
-  zmin = (translate * glm::vec4(0,0,-0.5,1)).z;
-  zmax = (translate * glm::vec4(0,0,0.5,1)).z;
+  this->rot = rotation;
+  xmin = (translate * rotation * scale * glm::vec4(-0.5,0,0,1)).x;
+  xmax = (translate * rotation * scale * glm::vec4(0.5,0,0,1)).x;
+  ymin = (translate * rotation * scale * glm::vec4(0,-0.5,0,1)).y;
+  ymax = (translate * rotation * scale * glm::vec4(0,0.5,0,1)).y;
+  zmin = (translate * rotation * glm::vec4(0,0,-1.3,1)).z;
+  zmax = (translate * rotation * glm::vec4(0,0,1.3,1)).z;
   Camera& cam = Camera::getInstance();
   std::cout << "xmin : " << xmin << "xmax : " << xmax << "ymin : " << ymin << "ymax : " << ymax << "zmin : " << zmin << "zmax : " << zmax << std::endl;
   if (cam._cameraPos.x < xmin || cam._cameraPos.x > xmax 
