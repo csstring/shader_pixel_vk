@@ -175,7 +175,7 @@ vec3 GetBaseSkyColor(vec3 rayDirection)
 
 vec3 GetSkyColor(in vec3 rayDirection)
 {
-    vec3 skyColor = GetBaseSkyColor(rayDirection);
+    vec3 skyColor = scatter(vec3(0,sceneData.viewPos.y,0), rayDirection);
     vec4 cloudColor = CloudColor(rayDirection );
     skyColor = mix(skyColor, cloudColor.rgb, cloudColor.a);
 

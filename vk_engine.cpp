@@ -64,7 +64,6 @@ void VulkanEngine::init()
 	auto sphere = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::MainColor);
 	auto World1_SkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World1_SkyBox, glm::scale(glm::vec3(0.2f)));
 	auto julia = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Julia, glm::scale(glm::vec3(0.2f)));
-	// auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
 	auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
 	auto sand = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::MainColor, glm::scale(glm::vec3(0.2f)));
 	auto envoff = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Offscreen, glm::scale(glm::vec3(0.2f)));
@@ -455,7 +454,7 @@ void VulkanEngine::run()
 		ImGui::SliderFloat("Water wave", &sceneData.waterData.w, 0, 15);
 		ImGui::End();
 		_cloud->guiRender();
-		_cloud->update(1.0f/120.f);
+		// _cloud->update(1.0f/120.f);
 		draw();
 	}
 }
@@ -1206,15 +1205,22 @@ void VulkanEngine::update_scene()
 	// loadedScenes["World1_SkyBox"]->Draw(s, mainDrawContext);
 	// loadedScenes["vulkanmodels"]->Draw(sprTransForm ,mainDrawContext);
 	// loadedScenes["vulkanscenelogos"]->Draw(sprTransForm ,mainDrawContext);
-	loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
-	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // cloudCube
-	// loadedScenes["cloudCube"]->Draw(sandTransForm1, mainDrawContext);
-	mainDrawContext.computeObj.push_back(loadedComputeObj["cloudDensity"].get());
-	mainDrawContext.computeObj.push_back(loadedComputeObj["cloudLighting"].get());
-
-	// sceneData.viewPos = _camera._view * glm::vec4(_camera._cameraPos, 1.0f);
 	std::chrono::duration<float> elapsed = now - start;
 	sceneData.viewPos = glm::vec4(_camera._cameraPos,1);
+	static int i =0;
+	int t = (int)(std::ceil(elapsed.count()));
+	if (t >= i)
+	{
+		i++;
+	}
+		_cloud->update(1.0f / 720.0f);
+		mainDrawContext.computeObj.push_back(loadedComputeObj["cloudDensity"].get());
+		mainDrawContext.computeObj.push_back(loadedComputeObj["cloudLighting"].get());
+		loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
+	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // cloudCube
+	// loadedScenes["cloudCube"]->Draw(sandTransForm1, mainDrawContext);
+
+	// sceneData.viewPos = _camera._view * glm::vec4(_camera._cameraPos, 1.0f);
 	sceneData.waterData.x = elapsed.count();
 	sceneData.cloudData.x = _cloud->constants.densityAbsorption;
 	sceneData.cloudData.y = _cloud->constants.aniso;

@@ -142,8 +142,6 @@ void main( )
     col *= 0.4;
                 
 		float dif1 = clamp( dot( light1, nor ), 0.0, 1.0 );
-
-
     float fre = 0.04 + 0.96*pow( clamp(1.0-dot(-rayDirection,nor),0.0,1.0), 5.0 );
     float spe = pow( clamp(dot(nor,hal),0.0,1.0), 12.0 ) * dif1 * fre*8.0;
         
