@@ -87,6 +87,8 @@ enum class MaterialPass :uint8_t {
     Julia,
     CloudDensity,
     CloudLighting,
+    ParticleComp,
+    ParticleRender,
     Other
 };
 
@@ -106,6 +108,11 @@ struct MaterialInstance {
     MaterialPipeline* pipeline;
     VkDescriptorSet materialSet;
     MaterialPass passType;
+};
+
+struct ParticleObject {
+  glm::vec4 position;
+  glm::vec4 velocity;//w life
 };
 
 struct RenderObject {
@@ -169,6 +176,12 @@ struct alignas(16) CloudPushConstants {
   float densityAbsorption;
   float aniso;
 	float dt;
+};
+
+struct alignas(16) ParticlePushConstants {
+	glm::vec4 cursor;
+  glm::vec4 genRange;
+  uint32_t seed;
 };
 
 struct alignas(16) DefualtPushConstants {

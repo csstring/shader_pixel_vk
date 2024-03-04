@@ -15,6 +15,7 @@
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 class CloudScene;
+class Particle;
 
 struct FrameData {
 	VkSemaphore _presentSemaphore, _renderSemaphore;
@@ -127,6 +128,7 @@ class VulkanEngine
     std::unordered_map<std::string, std::shared_ptr<ComputeObject>> loadedComputeObj;
     Portal _portalManager;
     CloudScene* _cloud;
+    Particle* _particle;
     EnvOffscreenRender* envRender;
     PSO _PSO;
 };

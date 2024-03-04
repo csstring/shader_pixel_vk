@@ -11,17 +11,8 @@ class CloudScene
 {
   private:
     VulkanEngine* _engine;
-
     DeletionQueue _deletionQueue;
     ComputeContext _computeContext;
-
-    void makeLightTexture();
-    void genCloud();
-
-    void initRenderPipelines();
-    void initGenCloudPipelines();
-    void initMakeLightTexturePipelines();
-
     glm::vec4 rot;
 
   public:
@@ -37,7 +28,7 @@ class CloudScene
 
     VkSampler _defaultSamplerLinear;
     VkSampler _defualtSamplerNear;
-    glm::vec3 modelTrans;
+    glm::vec3   modelTrans;
     glm::vec3  modelscale;
     uint32_t _curFrameIdx{0};
     AllocatedImage _cloudImageBuffer[2][2];
@@ -45,15 +36,11 @@ class CloudScene
     
     void initialize(VulkanEngine* engine);
     glm::mat4 getModelMatrix(){return glm::translate(modelTrans) * glm::rotate(glm::mat4(1.0f), rot.w, glm::vec3(rot)) * glm::scale(modelscale);};
-    void uploadCubeMesh();
     void update(float dt);
-    void draw(VkCommandBuffer cmd);
     void guiRender();
     void init_commands();
 		void init_sync_structures();
     void init_image_buffer();
-		void init_pipelines();
-    void init_descriptors();//fix me
 
     CloudScene(){};
     ~CloudScene(){

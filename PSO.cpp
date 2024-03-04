@@ -3,6 +3,8 @@
 #include "vk_engine.hpp"
 #include "vk_initializers.hpp"
 #include "Cloud.hpp"
+#include "Particle.hpp"
+
 
 void PSO::buildWorldSkyBoxpipelines(VulkanEngine* engine, GLTFMetallic* metallic)
 {
@@ -172,8 +174,8 @@ void PSO::build_cloudPipelines(VulkanEngine* engine, GLTFMetallic* metallic)
 	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 	VkDescriptorSetLayout layouts[] = { 
-			engine->_gpuSceneDataDescriptorLayout,
-      metallic->materialLayout };
+		engine->_gpuSceneDataDescriptorLayout,
+      	metallic->materialLayout };
 
 	VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
 	mesh_layout_info.setLayoutCount = 2;
@@ -184,7 +186,7 @@ void PSO::build_cloudPipelines(VulkanEngine* engine, GLTFMetallic* metallic)
 	VkPipelineLayout newLayout;
 	VK_CHECK(vkCreatePipelineLayout(engine->_device, &mesh_layout_info, nullptr, &newLayout));
 
-  cloudPipeline.layout = newLayout;
+  	cloudPipeline.layout = newLayout;
 
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 	PipelineBuilder pipelineBuilder;
@@ -200,7 +202,7 @@ void PSO::build_cloudPipelines(VulkanEngine* engine, GLTFMetallic* metallic)
 	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
 	pipelineBuilder._pipelineLayout = newLayout;
 
-  cloudPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
+  	cloudPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
 	pipelineBuilder.shaderFlush(engine->_device);
 
 	engine->_mainDeletionQueue.push_function([=]() {
@@ -335,8 +337,8 @@ void PSO::buildCloudDensityPipelines(VulkanEngine* engine, CloudScene* cloud)
 {
 	
 	DescriptorLayoutBuilder builder;
-  builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-  cloud->cloudDensityLayout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
+  	builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+  	cloud->cloudDensityLayout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
 	cloud->cloudDensityDescriptor = engine->globalDescriptorAllocator.allocate(engine->_device, cloud->cloudDensityLayout);
 
 	engine->_mainDeletionQueue.push_function([=]() {
@@ -361,7 +363,7 @@ void PSO::buildCloudDensityPipelines(VulkanEngine* engine, CloudScene* cloud)
 	VkPipelineLayout newLayout;
 	VK_CHECK(vkCreatePipelineLayout(engine->_device, &cloudDensity, nullptr, &newLayout));
 
-  cloudDensityPipeline.layout = newLayout;
+  	cloudDensityPipeline.layout = newLayout;
 	PipelineBuilder pipelineBuilder;
 	pipelineBuilder.loadShader("./spv/cloudDensity.comp.spv", engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
 	pipelineBuilder._pipelineLayout = newLayout;
@@ -376,10 +378,9 @@ void PSO::buildCloudDensityPipelines(VulkanEngine* engine, CloudScene* cloud)
 
 void PSO::buildCloudLightingPipelines(VulkanEngine* engine, CloudScene* cloud)
 {
-	
-		DescriptorLayoutBuilder builder;
+	DescriptorLayoutBuilder builder;
     builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-		builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+	builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
     cloud->cloudLightingLayout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
 	cloud->cloudLightingDescriptor = engine->globalDescriptorAllocator.allocate(engine->_device, cloud->cloudLightingLayout);
 	engine->_mainDeletionQueue.push_function([=]() {
@@ -392,7 +393,7 @@ void PSO::buildCloudLightingPipelines(VulkanEngine* engine, CloudScene* cloud)
 	matrixRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	VkDescriptorSetLayout layouts[] = { 
-			cloud->cloudLightingLayout
+		cloud->cloudLightingLayout
 	};
 
 	VkPipelineLayoutCreateInfo cloudDensity = vkinit::pipeline_layout_create_info();
@@ -404,7 +405,7 @@ void PSO::buildCloudLightingPipelines(VulkanEngine* engine, CloudScene* cloud)
 	VkPipelineLayout newLayout;
 	VK_CHECK(vkCreatePipelineLayout(engine->_device, &cloudDensity, nullptr, &newLayout));
 
-  cloudLightingPipeline.layout = newLayout;
+  	cloudLightingPipeline.layout = newLayout;
 	PipelineBuilder pipelineBuilder;
 	pipelineBuilder.loadShader("./spv/cloudLighting.comp.spv", engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
 	pipelineBuilder._pipelineLayout = newLayout;
@@ -419,9 +420,99 @@ void PSO::buildCloudLightingPipelines(VulkanEngine* engine, CloudScene* cloud)
   });
 }
 
+void PSO::buildParticleRenderPipeLines(VulkanEngine* engine, GLTFMetallic* metallic)
+{
+	VkPushConstantRange matrixRange{};
+	matrixRange.offset = 0;
+	matrixRange.size = sizeof(GPUDrawPushConstants);
+	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayout layouts[] = { 
+		engine->_gpuSceneDataDescriptorLayout,
+      	engine->_particle->_particleSetLayout};
+
+	VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
+	mesh_layout_info.setLayoutCount = 2;
+	mesh_layout_info.pSetLayouts = layouts;
+	mesh_layout_info.pPushConstantRanges = &matrixRange;
+	mesh_layout_info.pushConstantRangeCount = 1;
+
+	VkPipelineLayout newLayout;
+	VK_CHECK(vkCreatePipelineLayout(engine->_device, &mesh_layout_info, nullptr, &newLayout));
+
+  	particlePipeline.layout = newLayout;
+
+	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
+	PipelineBuilder pipelineBuilder;
+	pipelineBuilder.loadShader("./spv/particle.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);
+	pipelineBuilder.loadShader("./spv/particle.frag.spv", engine->_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+	pipelineBuilder._vertexInputInfo = vkinit::vertex_input_state_create_info(vertexDescription);
+	pipelineBuilder._inputAssembly = vkinit::input_assembly_create_info(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,0, false);
+	pipelineBuilder._viewport = vkinit::viewport_create_info(engine->_windowExtent);
+	pipelineBuilder._scissor= vkinit::scissor_create_info(engine->_windowExtent);
+	pipelineBuilder._rasterizer = vkinit::rasterization_state_create_info(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0);
+	pipelineBuilder._multisampling = vkinit::multisampling_state_create_info(VK_SAMPLE_COUNT_1_BIT, 0);
+	pipelineBuilder._colorBlendAttachment = vkinit::enable_blending_additive();
+	pipelineBuilder._depthStencil = vkinit::depth_stencil_create_info(true, true, VK_COMPARE_OP_LESS_OR_EQUAL);
+	pipelineBuilder._pipelineLayout = newLayout;
+
+  	particlePipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device, engine->_renderPass);
+	pipelineBuilder.shaderFlush(engine->_device);
+
+	engine->_mainDeletionQueue.push_function([=]() {
+		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
+		vkDestroyPipeline(engine->_device, particlePipeline.pipeline, nullptr);
+  	});
+}
+
+void PSO::buildParticleUpdatePipelines(VulkanEngine* engine, Particle* particle)
+{
+	DescriptorLayoutBuilder builder;
+    builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	// builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    particle->_particleSetLayout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT |VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+	particle->particleDescriptor = engine->globalDescriptorAllocator.allocate(engine->_device, particle->_particleSetLayout);
+	particle->_deletionQueue.push_function([=]() {
+        vkDestroyDescriptorSetLayout(engine->_device,  particle->_particleSetLayout, nullptr);
+  	});
+
+	VkPushConstantRange matrixRange{};
+	matrixRange.offset = 0;
+	matrixRange.size = sizeof(ParticlePushConstants);
+	matrixRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+	VkDescriptorSetLayout layouts[] = { 
+		particle->_particleSetLayout
+	};
+
+	VkPipelineLayoutCreateInfo cloudDensity = vkinit::pipeline_layout_create_info();
+	cloudDensity.setLayoutCount = 1;
+	cloudDensity.pSetLayouts = layouts;
+	cloudDensity.pPushConstantRanges = &matrixRange;
+	cloudDensity.pushConstantRangeCount = 1;
+
+	VkPipelineLayout newLayout;
+	VK_CHECK(vkCreatePipelineLayout(engine->_device, &cloudDensity, nullptr, &newLayout));
+
+  	particleCompPipeline.layout = newLayout;
+	PipelineBuilder pipelineBuilder;
+	pipelineBuilder.loadShader("./spv/particleUpdate.comp.spv", engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
+	pipelineBuilder._pipelineLayout = newLayout;
+
+	particleCompPipeline.pipeline = pipelineBuilder.build_compute_pipeline(engine->_device);
+	
+	pipelineBuilder.shaderFlush(engine->_device);
+
+	engine->_mainDeletionQueue.push_function([=]() {
+		vkDestroyPipelineLayout(engine->_device, newLayout, nullptr);
+		vkDestroyPipeline(engine->_device, particleCompPipeline.pipeline, nullptr);
+  });
+}
+
+//particle up pipe, particle rendering pipe vertex, geo, frag
 void PSO::buildPipeLine(VulkanEngine* engine)
 {
-  build_pipelines(engine,&(engine->metalRoughMaterial));
+  	build_pipelines(engine,&(engine->metalRoughMaterial));
 	buildWorldSkyBoxpipelines(engine,&(engine->metalRoughMaterial));
 	buildstencilFillpipelines(engine,&(engine->metalRoughMaterial));
 	build_cloudPipelines(engine,&(engine->metalRoughMaterial));
@@ -429,4 +520,6 @@ void PSO::buildPipeLine(VulkanEngine* engine)
 	buildJuliapipelines(engine,&(engine->metalRoughMaterial));
 	buildCloudDensityPipelines(engine, engine->_cloud);
 	buildCloudLightingPipelines(engine, engine->_cloud);
+	buildParticleUpdatePipelines(engine, engine->_particle);
+	buildParticleRenderPipeLines(engine, &(engine->metalRoughMaterial));
 }

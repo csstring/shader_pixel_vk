@@ -1,0 +1,51 @@
+#version 460
+
+struct Particle {
+    vec4 position;//wlife
+    vec4 velocity;
+};
+
+layout( push_constant ) uniform constants
+{
+	vec4 cursor;
+    vec4 genRange;
+    uint seed;
+} PushConstants;
+
+layout(std140, binding = 0) buffer ParticleSSBOIn {
+   Particle particles[];
+};
+
+vec4 G = vec4(0,-9.8f,0,0);
+
+layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+float rand_lcg(inout uint seed) {
+    const uint a = 1664525;
+    const uint c = 1013904223;
+    seed = a * (seed) + c;
+    float seedFloat = float(seed);
+    return (seedFloat / 2147483647.f);
+}
+
+void main() 
+{
+    uint index = gl_GlobalInvocationID.x;
+    uint seedVal = PushConstants.seed + index;
+    Particle particleIn = particles[index];
+    
+    particleIn.position.w -= 0.01;
+
+    if (particleIn.position.w <= 0.0f && PushConstants.cursor.w == 1)
+    {
+        float speedX = rand_lcg(seedVal) * 4.0f - 2.0f;
+        float speedY = rand_lcg(seedVal) * 4.0f - 2.0f;
+        float speedZ = rand_lcg(seedVal) * 4.0f - 2.0f;
+        particleIn.position = PushConstants.cursor;
+        particleIn.position.w = rand_lcg(seedVal) * 1.0f;
+        particleIn.velocity = vec4(speedX, speedY, speedZ, 0.0f);
+    }
+    
+    particles[index].velocity = particleIn.velocity + G * 0.025f;
+    particles[index].position = particleIn.position + particleIn.velocity * 0.025;
+}

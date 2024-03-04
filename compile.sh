@@ -23,3 +23,7 @@
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./cloud/shaderSource/cloudLighting.comp -o ./spv/cloudLighting.comp.spv
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./cloud/shaderSource/cloud.vert -o ./spv/cloud.vert.spv
 /Users/schoe/goinfre/vk/macOS/bin/glslc ./cloud/shaderSource/cloud.frag -o ./spv/cloud.frag.spv
+
+/Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/particle.vert -o ./spv/particle.vert.spv
+/Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/particle.frag -o ./spv/particle.frag.spv
+/Users/schoe/goinfre/vk/macOS/bin/glslc ./glsl/particleUpdate.comp -o ./spv/particleUpdate.comp.spv

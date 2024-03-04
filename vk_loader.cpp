@@ -11,6 +11,7 @@
 #include "parser.hpp"
 #include "tools.hpp"
 #include "GLTFMetallic.hpp"
+#include "Particle.hpp"
 
 std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath)
 {
@@ -682,6 +683,15 @@ std::optional<std::shared_ptr<ComputeObject>> loadComputeObj(VulkanEngine* engin
         matData.pipeline = &engine->_PSO.cloudLightingPipeline;
         writer.write_image(0, engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, engine->_defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		writer.write_image(1, engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, nullptr , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        writer.update_set(engine->_device, matData.materialSet);
+        break;
+        case MaterialPass::ParticleComp:
+        obj->dispatchX = engine->_particle->PARTICLE_COUNT / 64;
+        obj->dispatchY = 1;
+        obj->dispatchZ = 1;
+        matData.materialSet = engine->_particle->particleDescriptor;
+        matData.pipeline = &engine->_PSO.particleCompPipeline;
+        writer.write_buffer(0, engine->_particle->_particleBuffer.buffer, sizeof(ParticleObject) * engine->_particle->PARTICLE_COUNT, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         writer.update_set(engine->_device, matData.materialSet);
         break;
         default:

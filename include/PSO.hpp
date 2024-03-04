@@ -4,7 +4,7 @@
 class VulkanEngine;
 struct GLTFMetallic;
 class CloudScene;
-
+class Particle;
 class PSO
 {
   private:
@@ -16,6 +16,9 @@ class PSO
     void buildJuliapipelines(VulkanEngine* engine, GLTFMetallic* metallic);
     void buildCloudDensityPipelines(VulkanEngine* engine, CloudScene* cloud);
     void buildCloudLightingPipelines(VulkanEngine* engine, CloudScene* cloud);
+    void buildParticleRenderPipeLines(VulkanEngine* engine, GLTFMetallic* metallic);
+    void buildParticleUpdatePipelines(VulkanEngine* engine, Particle* particle);
+
   public:
     PSO(){};
     ~PSO(){};
@@ -32,8 +35,10 @@ class PSO
     MaterialPipeline waterPipeline;
     MaterialPipeline envPipeline;
     MaterialPipeline juliaPipeline;
+    MaterialPipeline particlePipeline;
 
     //compute shader
     MaterialPipeline cloudDensityPipeline;
     MaterialPipeline cloudLightingPipeline;
+    MaterialPipeline particleCompPipeline;
 };

@@ -1,5 +1,6 @@
 #include "GLTFMetallic.hpp"
 #include "vk_engine.hpp"
+#include "Particle.hpp"
 
 MaterialInstance GLTFMetallic::write_material(VulkanEngine* engine, MaterialPass pass, MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator)
 {
@@ -36,11 +37,11 @@ MaterialInstance GLTFMetallic::write_material(VulkanEngine* engine, MaterialPass
 	case MaterialPass::Offscreen:
 		matData.pipeline = &engine->_PSO.envPipeline;
 		resources.colorImage = engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY];
-    resources.colorSampler = engine->_defaultSamplerLinear;
+    	resources.colorSampler = engine->_defaultSamplerLinear;
 		resources.metalRoughImage = engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT];
 		resources.metalRoughSampler = engine->_defaultSamplerLinear;
 		resources.skyBoxImage = engine->_vulkanBoxImage;
-    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
+    	resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		matData.materialSet = descriptorAllocator.allocate(engine->_device, materialLayout);
 
 		writer.clear();
@@ -74,11 +75,11 @@ MaterialInstance GLTFMetallic::write_material(VulkanEngine* engine, MaterialPass
 	case MaterialPass::Cloud:
 		matData.pipeline = &engine->_PSO.cloudPipeline;
 		resources.colorImage = engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY];
-    resources.colorSampler = engine->_defaultSamplerLinear;
+    	resources.colorSampler = engine->_defaultSamplerLinear;
 		resources.metalRoughImage = engine->_cloud->_cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT];
 		resources.metalRoughSampler = engine->_defaultSamplerLinear;
 		resources.skyBoxImage = engine->_vulkanBoxImage;
-    resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
+    	resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
 		matData.materialSet = descriptorAllocator.allocate(engine->_device, materialLayout);
 
 		writer.clear();
@@ -86,6 +87,17 @@ MaterialInstance GLTFMetallic::write_material(VulkanEngine* engine, MaterialPass
 		writer.write_image(1, resources.colorImage._imageView, resources.colorSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		writer.write_image(2, resources.metalRoughImage._imageView, resources.metalRoughSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		writer.write_image(3, resources.skyBoxImage._imageView, resources.skyBoxSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+		writer.update_set(engine->_device, matData.materialSet);
+		return matData;
+	case MaterialPass::ParticleRender:
+		matData.pipeline = &engine->_PSO.particlePipeline;
+		resources.skyBoxImage = engine->_vulkanBoxImage;
+    	resources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
+		matData.materialSet = descriptorAllocator.allocate(engine->_device, engine->_particle->_particleSetLayout);
+
+		writer.clear();
+		writer.write_buffer(0, engine->_particle->_particleBuffer.buffer, sizeof(ParticleObject) * engine->_particle->PARTICLE_COUNT, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+		// writer.write_image(1, resources.skyBoxImage._imageView, resources.skyBoxSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 		writer.update_set(engine->_device, matData.materialSet);
 		return matData;
 	case MaterialPass::Julia:
