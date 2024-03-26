@@ -21,6 +21,7 @@
 #include "Cloud.hpp"
 #include "PSO.hpp"
 #include "glm/gtc/matrix_inverse.hpp"
+#include "Portal.hpp"
 
 void VulkanEngine::init()
 {
@@ -37,69 +38,31 @@ void VulkanEngine::init()
 		window_flags 
 	);
 
-  init_vulkan();
+  	init_vulkan();
 	init_swapchain();
-  init_commands();
-  init_default_renderpass();
+  	init_commands();
+  	init_default_renderpass();
 	init_framebuffers();
-  init_sync_structures();
-
-	envRender = new EnvOffscreenRender();
-	envRender->initialize(this);
+  	init_sync_structures();
 	init_descriptors();
-	_cloud = new CloudScene();
-	_cloud->initialize(this);
-  	init_pipelines();
-	load_meshes();
-	loadCubeMap(this, "./assets/textures/", "cubemap_vulkan.ktx", VK_FORMAT_R8G8B8A8_UNORM, &_vulkanBoxSamplerLinear, &_vulkanBoxImage);
-
 	init_imgui();
+  	init_scene();
+	load_meshes();
+
+	envRender = std::make_unique<EnvOffscreenRender>();
+	_cloud = std::make_unique<CloudScene>();
+	_portalManager = std::make_unique<Portal>();
+	
+	envRender->initialize(this);
+	_cloud->initialize(this);
+	_portalManager->initialize(glm::scale(glm::mat4(1.0f), glm::vec3(10.0f)), glm::mat4(1.0f) ,glm::translate(glm::vec3(0, 50, -4 )), PortalState::In_World0);
+  	
+	init_pipelines();
+	
+	loadCubeMap(this, "./assets/textures/", "cubemap_vulkan.ktx", VK_FORMAT_R8G8B8A8_UNORM, &_vulkanBoxSamplerLinear, &_vulkanBoxImage);
+	loadSceneObject();
+
 	_isInitialized = true;
-  init_scene();
-	_portalManager.initialize(glm::scale(glm::mat4(1.0f), glm::vec3(10.0f)), glm::mat4(1.0f) ,glm::translate(glm::vec3(0, 50, -4 )), PortalState::In_World0);
-  // auto FlightHelmetFile = loadGltf(this,"./assets/models/FlightHelmet/glTF/", "FlightHelmet.gltf");
-  // assert(FlightHelmetFile.has_value());
-  // loadedScenes["FlightHelmet"] = *FlightHelmetFile;
-
-	auto sphere = loadGltf(this,"./assets/models/", "sphere.gltf", MaterialPass::MainColor);
-	auto World1_SkyBox = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::World1_SkyBox, glm::scale(glm::vec3(0.2f)));
-	auto julia = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Julia, glm::scale(glm::vec3(0.2f)));
-	// auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
-	auto cloudCube = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));
-	auto sand = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::MainColor, glm::scale(glm::vec3(0.2f)));
-	auto envoff = loadGltf(this,"./assets/models/", "cube.gltf", MaterialPass::Offscreen, glm::scale(glm::vec3(0.2f)));
-
-	auto vulkanmodels = loadGltf(this,"./assets/models/", "vulkanscenemodels.gltf", MaterialPass::Transparent);
-	auto vulkanscenelogos = loadGltf(this,"./assets/models/", "vulkanscenelogos.gltf", MaterialPass::Transparent);
-	auto StencilFill_Zero = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill_Zero);
-	auto StencilFill_One = loadGltf(this,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill_One);
-
-	auto cloudDensity = loadComputeObj(this, MaterialPass::CloudDensity);
-	auto cloudLighting = loadComputeObj(this, MaterialPass::CloudLighting);
-	assert(World1_SkyBox.has_value());
-	assert(sphere.has_value());
-	assert(sand.has_value());
-	assert(StencilFill_Zero.has_value());
-	assert(StencilFill_One.has_value());
-	assert(cloudCube.has_value());
-	assert(envoff.has_value());
-	assert(julia.has_value());
-	assert(cloudDensity.has_value());
-	assert(cloudLighting.has_value());
-	assert(vulkanmodels.has_value());
-	assert(vulkanscenelogos.has_value());
-	loadedScenes["World1_SkyBox"] = *World1_SkyBox;
-	loadedScenes["sphere"] = *sphere;
-	loadedScenes["sand"] = *sand;
-	loadedScenes["StencilFill_Zero"] = *StencilFill_Zero;
-	loadedScenes["StencilFill_One"] = *StencilFill_One;
-	loadedScenes["cloudCube"] = *cloudCube;
-	loadedScenes["envoff"] = *envoff;
-	loadedScenes["julia"] = *julia;
-	loadedScenes["vulkanmodels"] = *vulkanmodels;
-	loadedScenes["vulkanscenelogos"] = *vulkanscenelogos;
-	loadedComputeObj["cloudDensity"] = *cloudDensity;
-	loadedComputeObj["cloudLighting"] = *cloudLighting;
 }
 
 void VulkanEngine::init_vulkan()
@@ -444,8 +407,8 @@ void VulkanEngine::run()
 
 		ImGui::NewFrame();
 // b.WaterTurbulence c.WaterAbsorption d.color
-    ImGui::Begin("Scene controller");
-  	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+		ImGui::Begin("Scene controller");
+		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 		ImGui::Text("carmera pos x : %f y : %f z : %f", camera._cameraPos.x, camera._cameraPos.y, camera._cameraPos.z);
 		ImGui::SliderFloat3("light pos", &sceneData.sunlightDirection.x, -1, 1);
 		ImGui::SliderFloat3("light color", &sceneData.sunlightColor.x, 0, 1);
@@ -533,9 +496,9 @@ void VulkanEngine::cleanup()
 {	
 	if (_isInitialized) {
 		vkDeviceWaitIdle(_device);
-    loadedScenes.clear();
-		delete _cloud;
-		delete envRender;
+    	loadedScenes.clear();
+		_cloud->destroy();
+		envRender->destroy();
 		for (int i =0; i < FRAME_OVERLAP; ++i){
     	vkWaitForFences(_device, 1, &_frames[i]._renderFence, true, 1000000000);
 			_frames[i]._deletionQueue.flush();
@@ -669,6 +632,7 @@ GPUMeshBuffers VulkanEngine::uploadMeshBuffers(std::vector<uint32_t> indices, st
 
 	return newSurface;
 }
+
 Material* VulkanEngine::create_material(VkPipeline pipeline, VkPipelineLayout layout, 
 const std::string& name, uint32_t layoutCount, VkDescriptorSet descriptorSet, 
 uint32_t constantSize, void* constantPtr)
@@ -811,8 +775,8 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageInde
 		}
 	}
 	//start the main renderpass.
-	depthClear.depthStencil = { 1.0f, _portalManager.getWorldIndex()};//info의 max깊이값을 1.0으로 해놔서 이걸로 초기화
-  clearValues[1] = depthClear;
+	depthClear.depthStencil = { 1.0f, _portalManager->getWorldIndex()};//info의 max깊이값을 1.0으로 해놔서 이걸로 초기화
+  	clearValues[1] = depthClear;
 	VkRenderPassBeginInfo rpInfo = {};
 	rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	rpInfo.pNext = nullptr;
@@ -1185,10 +1149,6 @@ void VulkanEngine::update_scene()
 	mainDrawContext.computeObj.clear();
 
 	// _portalManager.update();
-	glm::mat4 s = glm::translate(glm::vec3(0, 40, 0 )) *glm::rotate(-80.0f, glm::vec3(1,0,0))*glm::scale(glm::mat4(1.0f), glm::vec3(250.0f));
-
-	glm::mat4 sandTransForm = glm::translate(glm::vec3(0, -40, -0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(200.0f));
-	glm::mat4 sprTransForm = glm::translate(glm::vec3(0, 40, -100 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
 
 	glm::mat4 sandTransForm1 = glm::translate(glm::vec3(0, -40, -20 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
 	// switch (_portalManager.getPortalState())
@@ -1203,12 +1163,9 @@ void VulkanEngine::update_scene()
 	// default:
 	// 	break;
 	// }
-	// loadedScenes["World1_SkyBox"]->Draw(s, mainDrawContext);
-	// loadedScenes["vulkanmodels"]->Draw(sprTransForm ,mainDrawContext);
-	// loadedScenes["vulkanscenelogos"]->Draw(sprTransForm ,mainDrawContext);
-	loadedScenes["envoff"]->Draw(glm::mat4(1.0f), mainDrawContext);
-	loadedScenes["sand"]->Draw(glm::mat4(1.0f) * sandTransForm, mainDrawContext); // cloudCube
+
 	// loadedScenes["cloudCube"]->Draw(sandTransForm1, mainDrawContext);
+	envRender->drawSceneObject(this);
 	mainDrawContext.computeObj.push_back(loadedComputeObj["cloudDensity"].get());
 	mainDrawContext.computeObj.push_back(loadedComputeObj["cloudLighting"].get());
 
@@ -1224,4 +1181,18 @@ void VulkanEngine::destroy_image(const AllocatedImage& img)
 {
   vkDestroyImageView(_device, img._imageView, nullptr);
   vmaDestroyImage(_allocator, img._image, img._allocation);
+}
+
+void VulkanEngine::drawScene()
+{
+	mainDrawContext.OpaqueSurfaces.clear();
+	mainDrawContext.EnvSurfaces.clear();
+	mainDrawContext.computeObj.clear();
+}
+
+void VulkanEngine::loadSceneObject()
+{
+	envRender->loadSceneObject(this);
+	_cloud->loadSceneObject(this);
+	_portalManager->loadSceneObject(this);
 }

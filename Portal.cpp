@@ -2,6 +2,7 @@
 #include "Camera.hpp"
 #include <glm/gtx/transform.hpp>
 #include "glm/gtx/string_cast.hpp"
+#include "vk_engine.hpp"
 
 void Portal::update()
 {
@@ -58,4 +59,19 @@ void Portal::initialize(glm::mat4 scale, glm::mat4 rotation, glm::mat4 translate
   } else {
     inPortal = true;
   }
+}
+
+void Portal::loadSceneObject(VulkanEngine* engine)
+{
+  auto StencilFill_Zero = loadGltf(engine,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill_Zero); //_portalManager
+	auto StencilFill_One = loadGltf(engine,"./assets/models/", "plane_z.gltf", MaterialPass::StencilFill_One);//_portalManager
+  auto julia = loadGltf(engine,"./assets/models/", "cube.gltf", MaterialPass::Julia, glm::scale(glm::vec3(0.2f)));
+
+  assert(StencilFill_Zero.has_value());
+	assert(StencilFill_One.has_value());
+  assert(julia.has_value());
+  
+  engine->loadedScenes["StencilFill_Zero"] = *StencilFill_Zero;
+	engine->loadedScenes["StencilFill_One"] = *StencilFill_One;
+  engine->loadedScenes["julia"] = *julia;
 }

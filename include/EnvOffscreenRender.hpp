@@ -24,8 +24,11 @@ class EnvOffscreenRender
     uint32_t offscreenImageSize;
     std::array<VkFramebuffer, 6> frameBuffers;
     VkRenderPass offscreenRenderPass;
-    EnvOffscreenRender();
-    ~EnvOffscreenRender();
     void initialize(VulkanEngine* engine);
+    void destroy(){_deletionQueue.flush();};
+    void loadSceneObject(VulkanEngine* engine);
+    void drawSceneObject(VulkanEngine* engine);
+    ~EnvOffscreenRender(){};
+    EnvOffscreenRender(){offscreenImageSize = 1024 / 8;};
 };
 

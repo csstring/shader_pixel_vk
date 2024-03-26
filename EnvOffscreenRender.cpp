@@ -3,16 +3,6 @@
 #include "vk_textures.hpp"
 #include "vk_initializers.hpp"
 
-EnvOffscreenRender::EnvOffscreenRender()
-{
-  offscreenImageSize = 1024 / 8;
-}
-
-EnvOffscreenRender::~EnvOffscreenRender()
-{
-  _deletionQueue.flush();
-}
-
 void EnvOffscreenRender::createCubeMap(VulkanEngine* engine)
 {
 	envCubeImage._imageFormat = offscreenImageFormat;
@@ -217,4 +207,39 @@ void EnvOffscreenRender::initialize(VulkanEngine* engine)
   createCubeMap(engine);
   makeOffscreenRenderpass(engine);
   makeOffscreenFramebuffer(engine);
+}
+
+void EnvOffscreenRender::loadSceneObject(VulkanEngine* engine)
+{
+  auto ocean = loadGltf(engine,"./assets/models/", "cube.gltf", MaterialPass::MainColor, glm::scale(glm::vec3(0.2f)));//envRender
+	auto envoff = loadGltf(engine,"./assets/models/", "cube.gltf", MaterialPass::Offscreen, glm::scale(glm::vec3(0.2f))); //envRender
+  auto World1_SkyBox = loadGltf(engine,"./assets/models/", "cube.gltf", MaterialPass::World1_SkyBox, glm::scale(glm::vec3(0.2f))); //vulkan skybox
+	auto vulkanmodels = loadGltf(engine,"./assets/models/", "vulkanscenemodels.gltf", MaterialPass::Transparent);
+	auto vulkanscenelogos = loadGltf(engine,"./assets/models/", "vulkanscenelogos.gltf", MaterialPass::Transparent);
+
+  assert(ocean.has_value());
+	assert(envoff.has_value());
+	assert(World1_SkyBox.has_value());
+	assert(vulkanmodels.has_value());
+	assert(vulkanscenelogos.has_value());
+
+  engine->loadedScenes["ocean"] = *ocean;
+	engine->loadedScenes["envoff"] = *envoff;
+	engine->loadedScenes["World1_SkyBox"] = *World1_SkyBox;
+	engine->loadedScenes["vulkanmodels"] = *vulkanmodels;
+	engine->loadedScenes["vulkanscenelogos"] = *vulkanscenelogos;
+}
+
+void EnvOffscreenRender::drawSceneObject(VulkanEngine* engine)
+{
+  glm::mat4 oceanTransForm = glm::translate(glm::vec3(0, -40, -0 )) * glm::scale(glm::mat4(1.0f), glm::vec3(200.0f));
+  glm::mat4 skyBoxTransForm = glm::translate(glm::vec3(0, 40, 0 )) *glm::rotate(-80.0f, glm::vec3(1,0,0))*glm::scale(glm::mat4(1.0f), glm::vec3(250.0f));
+	glm::mat4 vulkanModelTransForm = glm::translate(glm::vec3(0, 40, -100 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
+
+  engine->loadedScenes["envoff"]->Draw(glm::mat4(1.0f), engine->mainDrawContext);
+	engine->loadedScenes["ocean"]->Draw(glm::mat4(1.0f) * oceanTransForm, engine->mainDrawContext);
+
+  engine->loadedScenes["World1_SkyBox"]->Draw(skyBoxTransForm, engine->mainDrawContext);
+	engine->loadedScenes["vulkanmodels"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
+	engine->loadedScenes["vulkanscenelogos"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
 }

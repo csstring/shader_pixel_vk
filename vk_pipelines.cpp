@@ -24,7 +24,6 @@ bool vkutil::load_shader_module(const char* filePath,
     file.read((char*)buffer.data(), fileSize);
     file.close();
 
-    // create a new shader module, using the buffer we loaded
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.pNext = nullptr;

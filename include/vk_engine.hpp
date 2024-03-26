@@ -14,7 +14,6 @@
 #include "GLTFMetallic.hpp"
 
 constexpr unsigned int FRAME_OVERLAP = 2;
-class CloudScene;
 
 struct FrameData {
 	VkSemaphore _presentSemaphore, _renderSemaphore;
@@ -47,6 +46,7 @@ class VulkanEngine
     void init_descriptors();
     void init_imgui();
     void update_scene();
+    void loadSceneObject();
 
   private:  
     
@@ -74,7 +74,8 @@ class VulkanEngine
     void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
     void destroy_buffer(const AllocatedBuffer& buffer);
     void destroy_image(const AllocatedImage& img);
-
+    void drawScene();
+    
   public :
     bool _isInitialized{ false };
 	  int _frameNumber {0};
@@ -125,8 +126,8 @@ class VulkanEngine
     std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
     std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
     std::unordered_map<std::string, std::shared_ptr<ComputeObject>> loadedComputeObj;
-    Portal _portalManager;
-    CloudScene* _cloud;
-    EnvOffscreenRender* envRender;
+    std::unique_ptr<Portal> _portalManager;
+    std::unique_ptr<CloudScene> _cloud;
+    std::unique_ptr<EnvOffscreenRender> envRender;
     PSO _PSO;
 };

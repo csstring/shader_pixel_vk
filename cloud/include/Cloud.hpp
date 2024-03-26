@@ -46,17 +46,14 @@ class CloudScene
     void initialize(VulkanEngine* engine);
     glm::mat4 getModelMatrix(){return glm::translate(modelTrans) * glm::rotate(glm::mat4(1.0f), rot.w, glm::vec3(rot)) * glm::scale(modelscale);};
     void uploadCubeMesh();
+    void loadSceneObject(VulkanEngine* engine);
     void update(float dt);
     void draw(VkCommandBuffer cmd);
     void guiRender();
     void init_commands();
 		void init_sync_structures();
     void init_image_buffer();
-		void init_pipelines();
-    void init_descriptors();//fix me
-
+    void destroy(){_deletionQueue.flush();};
     CloudScene(){};
-    ~CloudScene(){
-      _deletionQueue.flush();
-    };
+    ~CloudScene(){};
 };

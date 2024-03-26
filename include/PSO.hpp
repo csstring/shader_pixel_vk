@@ -14,8 +14,8 @@ class PSO
     void build_cloudPipelines(VulkanEngine* engine, GLTFMetallic* metallic);
     void buildEnvOffscreenPipelines(VulkanEngine* engine, GLTFMetallic* metallic);
     void buildJuliapipelines(VulkanEngine* engine, GLTFMetallic* metallic);
-    void buildCloudDensityPipelines(VulkanEngine* engine, CloudScene* cloud);
-    void buildCloudLightingPipelines(VulkanEngine* engine, CloudScene* cloud);
+    void buildCloudDensityPipelines(VulkanEngine* engine);
+    void buildCloudLightingPipelines(VulkanEngine* engine);
   public:
     PSO(){};
     ~PSO(){};

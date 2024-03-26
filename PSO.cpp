@@ -331,16 +331,16 @@ void PSO::build_pipelines(VulkanEngine* engine, GLTFMetallic* metallic)
   });
 }
 
-void PSO::buildCloudDensityPipelines(VulkanEngine* engine, CloudScene* cloud)
+void PSO::buildCloudDensityPipelines(VulkanEngine* engine)
 {
 	
 	DescriptorLayoutBuilder builder;
-  builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-  cloud->cloudDensityLayout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
-	cloud->cloudDensityDescriptor = engine->globalDescriptorAllocator.allocate(engine->_device, cloud->cloudDensityLayout);
+  	builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+  	engine->_cloud->cloudDensityLayout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
+	engine->_cloud->cloudDensityDescriptor = engine->globalDescriptorAllocator.allocate(engine->_device, engine->_cloud->cloudDensityLayout);
 
 	engine->_mainDeletionQueue.push_function([=]() {
-    vkDestroyDescriptorSetLayout(engine->_device,  cloud->cloudDensityLayout, nullptr);
+    vkDestroyDescriptorSetLayout(engine->_device,  engine->_cloud->cloudDensityLayout, nullptr);
   });
 
 	VkPushConstantRange matrixRange{};
@@ -349,7 +349,7 @@ void PSO::buildCloudDensityPipelines(VulkanEngine* engine, CloudScene* cloud)
 	matrixRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	VkDescriptorSetLayout layouts[] = { 
-			cloud->cloudDensityLayout
+			engine->_cloud->cloudDensityLayout
 	};
 
 	VkPipelineLayoutCreateInfo cloudDensity = vkinit::pipeline_layout_create_info();
@@ -374,17 +374,17 @@ void PSO::buildCloudDensityPipelines(VulkanEngine* engine, CloudScene* cloud)
   });
 }
 
-void PSO::buildCloudLightingPipelines(VulkanEngine* engine, CloudScene* cloud)
+void PSO::buildCloudLightingPipelines(VulkanEngine* engine)
 {
 	
-		DescriptorLayoutBuilder builder;
+	DescriptorLayoutBuilder builder;
     builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-		builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    cloud->cloudLightingLayout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
-	cloud->cloudLightingDescriptor = engine->globalDescriptorAllocator.allocate(engine->_device, cloud->cloudLightingLayout);
+	builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    engine->_cloud->cloudLightingLayout = builder.build(engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
+	engine->_cloud->cloudLightingDescriptor = engine->globalDescriptorAllocator.allocate(engine->_device, engine->_cloud->cloudLightingLayout);
 	engine->_mainDeletionQueue.push_function([=]() {
-        vkDestroyDescriptorSetLayout(engine->_device,  cloud->cloudLightingLayout, nullptr);
-  });
+        vkDestroyDescriptorSetLayout(engine->_device,  engine->_cloud->cloudLightingLayout, nullptr);
+  	});
 
 	VkPushConstantRange matrixRange{};
 	matrixRange.offset = 0;
@@ -392,7 +392,7 @@ void PSO::buildCloudLightingPipelines(VulkanEngine* engine, CloudScene* cloud)
 	matrixRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
 	VkDescriptorSetLayout layouts[] = { 
-			cloud->cloudLightingLayout
+			engine->_cloud->cloudLightingLayout
 	};
 
 	VkPipelineLayoutCreateInfo cloudDensity = vkinit::pipeline_layout_create_info();
@@ -427,6 +427,6 @@ void PSO::buildPipeLine(VulkanEngine* engine)
 	build_cloudPipelines(engine,&(engine->metalRoughMaterial));
 	buildEnvOffscreenPipelines(engine,&(engine->metalRoughMaterial));
 	buildJuliapipelines(engine,&(engine->metalRoughMaterial));
-	buildCloudDensityPipelines(engine, engine->_cloud);
-	buildCloudLightingPipelines(engine, engine->_cloud);
+	buildCloudDensityPipelines(engine);
+	buildCloudLightingPipelines(engine);
 }

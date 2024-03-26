@@ -43,11 +43,6 @@ void CloudScene::initialize(VulkanEngine* engine)
 
 }
 
-void CloudScene::initRenderPipelines()
-{
-	
-}
-
 void CloudScene::initGenCloudPipelines()
 {
 	VkDescriptorSetLayout descriptorSetLayout;
@@ -184,10 +179,6 @@ void CloudScene::initMakeLightTexturePipelines()
 	}
 }
 
-void CloudScene::init_pipelines()
-{
-}
-
 void CloudScene::uploadCubeMesh()
 {
 	Mesh cube{};
@@ -254,8 +245,6 @@ void CloudScene::init_image_buffer()
 	});
 }
 
-void CloudScene::init_descriptors(){}
-
 void CloudScene::makeLightTexture()
 {
   Material* computMaterial = _engine->get_material("MAKELIGHTTEXTURE");
@@ -284,4 +273,19 @@ void CloudScene::update(float dt)
 
 void CloudScene::draw(VkCommandBuffer cmd)
 {
+}
+
+void CloudScene::loadSceneObject(VulkanEngine* engine)
+{
+  	auto cloudCube = loadGltf(engine,"./assets/models/", "cube.gltf", MaterialPass::Cloud, glm::scale(glm::vec3(0.2f)));//_cloud
+	auto cloudDensity = loadComputeObj(engine, MaterialPass::CloudDensity); //_cloud
+	auto cloudLighting = loadComputeObj(engine, MaterialPass::CloudLighting); // _cloud
+
+	assert(cloudCube.has_value());
+	assert(cloudDensity.has_value());
+	assert(cloudLighting.has_value());
+
+  	engine->loadedScenes["cloudCube"] = *cloudCube;
+	engine->loadedComputeObj["cloudDensity"] = *cloudDensity;
+	engine->loadedComputeObj["cloudLighting"] = *cloudLighting;
 }
