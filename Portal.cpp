@@ -75,3 +75,19 @@ void Portal::loadSceneObject(VulkanEngine* engine)
 	engine->loadedScenes["StencilFill_One"] = *StencilFill_One;
   engine->loadedScenes["julia"] = *julia;
 }
+
+void Portal::drawSceneObject(VulkanEngine* engine)
+{
+  switch (getPortalState())
+	{
+	case PortalState::In_World0:
+		engine->loadedScenes["StencilFill_One"]->Draw(getModelTransForm(), engine->mainDrawContext);
+		break;
+	case PortalState::In_World1:
+		engine->loadedScenes["StencilFill_Zero"]->Draw(getModelTransForm(), engine->mainDrawContext);
+		// loadedScenes["julia"]->Draw(glm::scale(glm::mat4(1.0f), glm::vec3(40.0f)) ,mainDrawContext);
+		break;
+	default:
+		break;
+	}
+}

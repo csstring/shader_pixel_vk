@@ -197,9 +197,68 @@ void EnvOffscreenRender::makeOffscreenFramebuffer(VulkanEngine* engine)
     engine->destroy_image(depthImage);
   });
 }
-void EnvOffscreenRender::renderCubeFace(uint32_t faceIndex, VkCommandBuffer commandBuffer,VulkanEngine* engine)
+void EnvOffscreenRender::renderCubeFace(VkCommandBuffer cmd, VulkanEngine* engine, VkDescriptorSet globalDescriptor)
 {
+  GPUDrawPushConstants pushConstants;
+	pushConstants.proj = glm::perspective((float)(M_PI / 2.0f), 1.0f, 0.1f, 1024.0f);
 
+	VkClearValue clearValue;
+	clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+
+  VkClearValue depthClear;
+	depthClear.depthStencil = { 1.0f, 0};//info의 max깊이값을 1.0으로 해놔서 이걸로 초기화
+
+  VkClearValue clearValues[] = {clearValue, depthClear};
+
+  for (const RenderObject& draw : engine->mainDrawContext.EnvSurfaces)
+	{
+		VkDeviceSize offset = 0;
+		vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
+		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 0,1, &globalDescriptor,0,nullptr );
+		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 1,1, &draw.material->materialSet,0,nullptr );
+		vkCmdBindIndexBuffer(cmd, draw.indexBuffer,0,VK_INDEX_TYPE_UINT32);
+		vkCmdBindVertexBuffers(cmd, 0, 1, &draw.vertexBuffer, &offset);
+		for (int faceIndex = 0; faceIndex < 6; faceIndex++){
+			VkRenderPassBeginInfo rpInfo = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+			rpInfo.renderPass = offscreenRenderPass;
+			rpInfo.framebuffer = frameBuffers[faceIndex];
+			rpInfo.renderArea.extent.width = offscreenImageSize;
+			rpInfo.renderArea.extent.height = offscreenImageSize;
+			rpInfo.clearValueCount = 2;
+			rpInfo.pClearValues = clearValues;
+			
+			vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+			glm::mat4 viewMatrix = glm::mat4(1.0f);
+			switch (faceIndex)
+			{
+			case 0: // POSITIVE_X
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 1:	// NEGATIVE_X
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 2:	// POSITIVE_Y
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 3:	// NEGATIVE_Y
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 4:	// POSITIVE_Z
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+				break;
+			case 5:	// NEGATIVE_Z
+				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+				break;
+			}
+			pushConstants.view = viewMatrix;
+			vkCmdPushConstants(cmd, draw.material->pipeline->layout ,VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0, sizeof(GPUDrawPushConstants), &pushConstants);
+			vkCmdDrawIndexed(cmd, draw.indexCount,1,draw.firstIndex,0,0);
+			vkCmdEndRenderPass(cmd);
+		}
+	}
 }
 
 void EnvOffscreenRender::initialize(VulkanEngine* engine)
@@ -239,7 +298,7 @@ void EnvOffscreenRender::drawSceneObject(VulkanEngine* engine)
   engine->loadedScenes["envoff"]->Draw(glm::mat4(1.0f), engine->mainDrawContext);
 	engine->loadedScenes["ocean"]->Draw(glm::mat4(1.0f) * oceanTransForm, engine->mainDrawContext);
 
-  engine->loadedScenes["World1_SkyBox"]->Draw(skyBoxTransForm, engine->mainDrawContext);
-	engine->loadedScenes["vulkanmodels"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
-	engine->loadedScenes["vulkanscenelogos"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
+  // engine->loadedScenes["World1_SkyBox"]->Draw(skyBoxTransForm, engine->mainDrawContext);
+	// engine->loadedScenes["vulkanmodels"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
+	// engine->loadedScenes["vulkanscenelogos"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
 }

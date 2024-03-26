@@ -15,7 +15,6 @@ class EnvOffscreenRender
     void createCubeMap(VulkanEngine* engine);
     void makeOffscreenRenderpass(VulkanEngine* engine);
     void makeOffscreenFramebuffer(VulkanEngine* engine);
-    void renderCubeFace(uint32_t faceIndex, VkCommandBuffer commandBuffer,VulkanEngine* engine);
 
   public:
 		VkSampler sampler;
@@ -26,6 +25,7 @@ class EnvOffscreenRender
     VkRenderPass offscreenRenderPass;
     void initialize(VulkanEngine* engine);
     void destroy(){_deletionQueue.flush();};
+    void renderCubeFace(VkCommandBuffer cmd,VulkanEngine* engine, VkDescriptorSet globalDescriptor);
     void loadSceneObject(VulkanEngine* engine);
     void drawSceneObject(VulkanEngine* engine);
     ~EnvOffscreenRender(){};

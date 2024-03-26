@@ -390,6 +390,26 @@ void VulkanEngine::init_pipelines()
 	_PSO.buildPipeLine(this);
 }
 
+void VulkanEngine::GUIRender()
+{
+	Camera& camera = Camera::getInstance();
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplSDL2_NewFrame(_window);
+
+	ImGui::NewFrame();
+	ImGui::Begin("Scene controller");
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::Text("carmera pos x : %f y : %f z : %f", camera._cameraPos.x, camera._cameraPos.y, camera._cameraPos.z);
+	ImGui::SliderFloat3("light pos", &sceneData.sunlightDirection.x, -1, 1);
+	ImGui::SliderFloat3("light color", &sceneData.sunlightColor.x, 0, 1);
+	ImGui::SliderFloat("light power", &sceneData.sunlightColor.w, 0, 100);
+	ImGui::SliderFloat("WaterTurbulence", &sceneData.waterData.y, -20, 20);
+	ImGui::SliderFloat("WaterAbsorption", &sceneData.waterData.z, 0, 1);
+	ImGui::SliderFloat("Water wave", &sceneData.waterData.w, 0, 15);
+	ImGui::End();
+
+	_cloud->guiRender();
+}
 //------------------run-------------
 void VulkanEngine::run()
 {
@@ -402,22 +422,7 @@ void VulkanEngine::run()
 		vkutil::SDL_event_process(&e, camera, bQuit);
 		update_scene();
 		camera.update();
-		ImGui_ImplVulkan_NewFrame();
-		ImGui_ImplSDL2_NewFrame(_window);
-
-		ImGui::NewFrame();
-// b.WaterTurbulence c.WaterAbsorption d.color
-		ImGui::Begin("Scene controller");
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-		ImGui::Text("carmera pos x : %f y : %f z : %f", camera._cameraPos.x, camera._cameraPos.y, camera._cameraPos.z);
-		ImGui::SliderFloat3("light pos", &sceneData.sunlightDirection.x, -1, 1);
-		ImGui::SliderFloat3("light color", &sceneData.sunlightColor.x, 0, 1);
-		ImGui::SliderFloat("light power", &sceneData.sunlightColor.w, 0, 100);
-		ImGui::SliderFloat("WaterTurbulence", &sceneData.waterData.y, -20, 20);
-		ImGui::SliderFloat("WaterAbsorption", &sceneData.waterData.z, 0, 1);
-		ImGui::SliderFloat("Water wave", &sceneData.waterData.w, 0, 15);
-		ImGui::End();
-		_cloud->guiRender();
+		GUIRender();
 		_cloud->update(1.0f/120.f);
 		draw();
 	}
@@ -432,13 +437,12 @@ void VulkanEngine::draw()
 	get_current_frame()._deletionQueue.flush();
 	get_current_frame()._frameDescriptors.clear_pools(_device);
 
-  uint32_t swapchainImageIndex;
+  	uint32_t swapchainImageIndex;
 	VK_CHECK(vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._presentSemaphore, nullptr, &swapchainImageIndex));
-  VK_CHECK(vkResetCommandBuffer(get_current_frame()._mainCommandBuffer, 0));
+  	VK_CHECK(vkResetCommandBuffer(get_current_frame()._mainCommandBuffer, 0));
 	
 
-  VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
-	//begin the command buffer recording. We will use this command buffer exactly once, so we want to let Vulkan know that
+  	VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
 	VkCommandBufferBeginInfo cmdBeginInfo = {};
 	cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	cmdBeginInfo.pNext = nullptr;
@@ -450,11 +454,10 @@ void VulkanEngine::draw()
 
 	// cloudScene->update(1./120., _frameNumber % 2);
 	ImGui::Render();
-  draw_objects(cmd, swapchainImageIndex);
-	//finalize the command buffer (we can no longer add commands, but it can now be executed)
+  	draw_objects(cmd, swapchainImageIndex);
 	VK_CHECK(vkEndCommandBuffer(cmd));
 
-  VkSubmitInfo submit = {};
+  	VkSubmitInfo submit = {};
 	submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submit.pNext = nullptr;
 
@@ -471,11 +474,9 @@ void VulkanEngine::draw()
 	submit.commandBufferCount = 1;
 	submit.pCommandBuffers = &cmd;
 
-	//submit command buffer to the queue and execute it.
-	// _renderFence will now block until the graphic commands finish execution
 	VK_CHECK(vkQueueSubmit(_graphicsQueue, 1, &submit, get_current_frame()._renderFence));
   
-  VkPresentInfoKHR presentInfo = {};
+  	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.pNext = nullptr;
 
@@ -559,34 +560,6 @@ void VulkanEngine::load_meshes()
 	materialResources.dataBufferOffset = 0;
 }
 
-void VulkanEngine::upload_mesh(Mesh& mesh)
-{
-	const size_t bufferSize = mesh._vertices.size() * sizeof(Vertex);
-
-	mesh._vertexBuffer = create_buffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT ,
-		VMA_MEMORY_USAGE_GPU_ONLY);
-	AllocatedBuffer staging = create_buffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-
-	void* data;
-	vmaMapMemory(_allocator, staging.allocation, &data);
-	memcpy(data, mesh._vertices.data(), bufferSize);
-	vmaFlushAllocation(_allocator, staging.allocation, 0, VK_WHOLE_SIZE);
-  vmaUnmapMemory(_allocator, staging.allocation);
-
-	immediate_submit([&](VkCommandBuffer cmd) {
-		VkBufferCopy vertexCopy{ 0 };
-		vertexCopy.dstOffset = 0;
-		vertexCopy.srcOffset = 0;
-		vertexCopy.size = bufferSize;
-
-		vkCmdCopyBuffer(cmd, staging.buffer, mesh._vertexBuffer.buffer, 1, &vertexCopy);
-	});
-
-	_mainDeletionQueue.push_function([=]() {
-	vmaDestroyBuffer(_allocator, mesh._vertexBuffer.buffer, mesh._vertexBuffer.allocation);
-	});
-	vmaDestroyBuffer(_allocator, staging.buffer, staging.allocation);
-}
 
 GPUMeshBuffers VulkanEngine::uploadMeshBuffers(std::vector<uint32_t> indices, std::vector<Vertex> vertices)
 {
@@ -633,43 +606,6 @@ GPUMeshBuffers VulkanEngine::uploadMeshBuffers(std::vector<uint32_t> indices, st
 	return newSurface;
 }
 
-Material* VulkanEngine::create_material(VkPipeline pipeline, VkPipelineLayout layout, 
-const std::string& name, uint32_t layoutCount, VkDescriptorSet descriptorSet, 
-uint32_t constantSize, void* constantPtr)
-{
-	Material mat;
-	mat.setLayoutCount = layoutCount;
-	mat.textureSet = descriptorSet;
-	mat.pipeline = pipeline;
-	mat.pipelineLayout = layout;
-	mat.constantSize = constantSize;
-	mat.constant = constantPtr;
-	_materials[name] = mat;
-	return &_materials[name];
-}
-
-Material* VulkanEngine::get_material(const std::string& name)
-{
-	//search for the object, and return nullptr if not found
-	auto it = _materials.find(name);
-	if (it == _materials.end()) {
-		return nullptr;
-	}
-	else {
-		return &(*it).second;
-	}
-}
-
-Mesh* VulkanEngine::get_mesh(const std::string& name)
-{
-	auto it = _meshes.find(name);
-	if (it == _meshes.end()) {
-		return nullptr;
-	}
-	else {
-		return &(*it).second;
-	}
-}
 
 void VulkanEngine::init_scene()
 {
@@ -680,7 +616,7 @@ void VulkanEngine::init_scene()
 	sceneData.waterData.w = 1;
 }
 
-void VulkanEngine::computeCloud(VkCommandBuffer cmd)
+void VulkanEngine::computeShaderCalc(VkCommandBuffer cmd)
 {
 	for (const ComputeObject* draw : mainDrawContext.computeObj)
 	{
@@ -691,108 +627,10 @@ void VulkanEngine::computeCloud(VkCommandBuffer cmd)
 	}
 }
 
-void VulkanEngine::draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageIndex)
+void VulkanEngine::OpaqueRender(VkCommandBuffer cmd,VkRenderPassBeginInfo rpInfo, GPUDrawPushConstants& pushConstants, VkDescriptorSet globalDescriptor)
 {
-	computeCloud(cmd);
-
-	AllocatedBuffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	Camera& _camera = Camera::getInstance();
-	//add it to the deletion queue of this frame so it gets deleted once its been used
-	get_current_frame()._deletionQueue.push_function([=]() {
-    destroy_buffer(gpuSceneDataBuffer);
-	});
-
-	VkDescriptorSet globalDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
-
-	DescriptorWriter writer;
-	writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-	writer.update_set(_device, globalDescriptor);
-
-	void* data;
-	vmaMapMemory(_allocator, gpuSceneDataBuffer.allocation, &data);
-	memcpy(data, &sceneData, sizeof(GPUSceneData));
-	vmaFlushAllocation(_allocator, gpuSceneDataBuffer.allocation, 0, VK_WHOLE_SIZE);
-	vmaUnmapMemory(_allocator, gpuSceneDataBuffer.allocation);
-
-	GPUDrawPushConstants pushConstants;
-	pushConstants.proj = glm::perspective((float)(M_PI / 2.0f), 1.0f, 0.1f, 1024.0f);
-
-	VkClearValue clearValue;
-	clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
-
-  VkClearValue depthClear;
-	depthClear.depthStencil = { 1.0f, 0};//info의 max깊이값을 1.0으로 해놔서 이걸로 초기화
-
-  VkClearValue clearValues[] = {clearValue, depthClear};
-	for (const RenderObject& draw : mainDrawContext.EnvSurfaces)
-	{
-		VkDeviceSize offset = 0;
-		vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
-		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 0,1, &globalDescriptor,0,nullptr );
-		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 1,1, &draw.material->materialSet,0,nullptr );
-		vkCmdBindIndexBuffer(cmd, draw.indexBuffer,0,VK_INDEX_TYPE_UINT32);
-		vkCmdBindVertexBuffers(cmd, 0, 1, &draw.vertexBuffer, &offset);
-		for (int faceIndex = 0; faceIndex < 6; faceIndex++){
-			VkRenderPassBeginInfo rpInfo = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-			// Reuse render pass from example pass
-			rpInfo.renderPass = envRender->offscreenRenderPass;
-			rpInfo.framebuffer = envRender->frameBuffers[faceIndex];
-			rpInfo.renderArea.extent.width = envRender->offscreenImageSize;
-			rpInfo.renderArea.extent.height = envRender->offscreenImageSize;
-			rpInfo.clearValueCount = 2;
-			rpInfo.pClearValues = clearValues;
-			
-		vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-			glm::mat4 viewMatrix = glm::mat4(1.0f);
-			switch (faceIndex)
-			{
-			case 0: // POSITIVE_X
-				viewMatrix = glm::rotate(viewMatrix, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-				break;
-			case 1:	// NEGATIVE_X
-				viewMatrix = glm::rotate(viewMatrix, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-				break;
-			case 2:	// POSITIVE_Y
-				viewMatrix = glm::rotate(viewMatrix, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-				break;
-			case 3:	// NEGATIVE_Y
-				viewMatrix = glm::rotate(viewMatrix, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-				break;
-			case 4:	// POSITIVE_Z
-				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-				break;
-			case 5:	// NEGATIVE_Z
-				viewMatrix = glm::rotate(viewMatrix, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-				break;
-			}
-			pushConstants.view = viewMatrix;
-			vkCmdPushConstants(cmd, draw.material->pipeline->layout ,VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0, sizeof(GPUDrawPushConstants), &pushConstants);
-			vkCmdDrawIndexed(cmd, draw.indexCount,1,draw.firstIndex,0,0);
-			vkCmdEndRenderPass(cmd);
-		}
-	}
-	//start the main renderpass.
-	depthClear.depthStencil = { 1.0f, _portalManager->getWorldIndex()};//info의 max깊이값을 1.0으로 해놔서 이걸로 초기화
-  	clearValues[1] = depthClear;
-	VkRenderPassBeginInfo rpInfo = {};
-	rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	rpInfo.pNext = nullptr;
-
-	rpInfo.renderPass = _renderPass;
-	rpInfo.renderArea.offset.x = 0;
-	rpInfo.renderArea.offset.y = 0;
-	rpInfo.renderArea.extent = _windowExtent;
-	rpInfo.framebuffer = _framebuffers[swapchainImageIndex];
-
-	//connect clear values
-	rpInfo.clearValueCount = 2;
-	rpInfo.pClearValues = clearValues;
 	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-	pushConstants.proj = _camera.getProjection();
-	pushConstants.proj[1][1] *= -1;
 	for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces)
 	{
 		pushConstants.view = _camera._view;
@@ -811,8 +649,94 @@ void VulkanEngine::draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageInde
 	}
 	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 
-  vkCmdEndRenderPass(cmd);
+  	vkCmdEndRenderPass(cmd);
+}
 
+void VulkanEngine::TransparentRender(VkCommandBuffer cmd,VkRenderPassBeginInfo rpInfo, GPUDrawPushConstants& pushConstants, VkDescriptorSet globalDescriptor)
+{
+	Camera& _camera = Camera::getInstance();
+	vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+	for (const RenderObject& draw : mainDrawContext.TransparentSurfaces)
+	{
+		pushConstants.view = _camera._view;
+		VkDeviceSize offset = 0;
+		vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
+		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 0,1, &globalDescriptor,0,nullptr );
+		vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,draw.material->pipeline->layout, 1,1, &draw.material->materialSet,0,nullptr );
+		vkCmdBindIndexBuffer(cmd, draw.indexBuffer,0,VK_INDEX_TYPE_UINT32);
+		vkCmdBindVertexBuffers(cmd, 0, 1, &draw.vertexBuffer, &offset);
+
+		pushConstants.worldMatrix = draw.transform;
+		pushConstants.normal = glm::inverseTranspose(pushConstants.view * draw.transform);
+		vkCmdPushConstants(cmd, draw.material->pipeline->layout ,VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0, sizeof(GPUDrawPushConstants), &pushConstants);
+		
+		vkCmdDrawIndexed(cmd, draw.indexCount,1,draw.firstIndex,0,0);
+	}
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+
+  	vkCmdEndRenderPass(cmd);
+}
+
+void VulkanEngine::draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageIndex)
+{
+
+	AllocatedBuffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	Camera& _camera = Camera::getInstance();
+	//add it to the deletion queue of this frame so it gets deleted once its been used
+	get_current_frame()._deletionQueue.push_function([=]() {
+    	destroy_buffer(gpuSceneDataBuffer);
+	});
+
+	VkDescriptorSet globalDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
+
+	DescriptorWriter writer;
+	writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	writer.update_set(_device, globalDescriptor);
+
+	void* data;
+	vmaMapMemory(_allocator, gpuSceneDataBuffer.allocation, &data);
+	memcpy(data, &sceneData, sizeof(GPUSceneData));
+	vmaFlushAllocation(_allocator, gpuSceneDataBuffer.allocation, 0, VK_WHOLE_SIZE);
+	vmaUnmapMemory(_allocator, gpuSceneDataBuffer.allocation);
+	
+	//compute shader
+	computeShaderCalc(cmd);
+
+	//env render
+	envRender->renderCubeFace(cmd, this, globalDescriptor);
+
+	//other render
+	GPUDrawPushConstants pushConstants;
+
+	VkClearValue clearValue;
+	clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+
+  	VkClearValue depthClear;
+	depthClear.depthStencil = { 1.0f, _portalManager->getWorldIndex()};//info의 max깊이값을 1.0으로 해놔서 이걸로 초기화
+
+  	VkClearValue clearValues[] = {clearValue, depthClear};
+
+	VkRenderPassBeginInfo rpInfo = {};
+	rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rpInfo.pNext = nullptr;
+
+	rpInfo.renderPass = _renderPass;
+	rpInfo.renderArea.offset.x = 0;
+	rpInfo.renderArea.offset.y = 0;
+	rpInfo.renderArea.extent = _windowExtent;
+	rpInfo.framebuffer = _framebuffers[swapchainImageIndex];
+
+	//connect clear values
+	rpInfo.clearValueCount = 2;
+	rpInfo.pClearValues = clearValues;
+	pushConstants.proj = _camera.getProjection();
+	pushConstants.proj[1][1] *= -1;
+
+	if (mainDrawContext.OpaqueSurfaces.size())
+		OpaqueRender(cmd, rpInfo, pushConstants, globalDescriptor);
+	if (mainDrawContext.TransparentSurfaces.size())
+		TransparentRender(cmd, rpInfo, pushConstants, globalDescriptor);
+	
 	//mirror
 	// for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces)
 	// {
@@ -876,11 +800,6 @@ void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& f
 	vkWaitForFences(_device, 1, &_uploadContext._uploadFence, true, 9999999999);
 	vkResetFences(_device, 1, &_uploadContext._uploadFence);
 	vkResetCommandPool(_device, _uploadContext._commandPool, 0);
-}
-
-void VulkanEngine::load_images()
-{
-
 }
 
 void VulkanEngine::init_imgui()
@@ -1148,28 +1067,11 @@ void VulkanEngine::update_scene()
 	mainDrawContext.EnvSurfaces.clear();
 	mainDrawContext.computeObj.clear();
 
-	// _portalManager.update();
-
-	glm::mat4 sandTransForm1 = glm::translate(glm::vec3(0, -40, -20 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
-	// switch (_portalManager.getPortalState())
-	// {
-	// case PortalState::In_World0:
-	// 	loadedScenes["StencilFill_One"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
-	// 	break;
-	// case PortalState::In_World1:
-	// 	loadedScenes["StencilFill_Zero"]->Draw(_portalManager.getModelTransForm(), mainDrawContext);
-	// 	// loadedScenes["julia"]->Draw(glm::scale(glm::mat4(1.0f), glm::vec3(40.0f)) ,mainDrawContext);
-	// 	break;
-	// default:
-	// 	break;
-	// }
-
-	// loadedScenes["cloudCube"]->Draw(sandTransForm1, mainDrawContext);
+	// _portalManager->update();
+	// _portalManager->drawSceneObject(this);
 	envRender->drawSceneObject(this);
-	mainDrawContext.computeObj.push_back(loadedComputeObj["cloudDensity"].get());
-	mainDrawContext.computeObj.push_back(loadedComputeObj["cloudLighting"].get());
+	_cloud->drawSceneObject(this);
 
-	// sceneData.viewPos = _camera._view * glm::vec4(_camera._cameraPos, 1.0f);
 	std::chrono::duration<float> elapsed = now - start;
 	sceneData.viewPos = glm::vec4(_camera._cameraPos,1);
 	sceneData.waterData.x = elapsed.count();
@@ -1181,13 +1083,6 @@ void VulkanEngine::destroy_image(const AllocatedImage& img)
 {
   vkDestroyImageView(_device, img._imageView, nullptr);
   vmaDestroyImage(_allocator, img._image, img._allocation);
-}
-
-void VulkanEngine::drawScene()
-{
-	mainDrawContext.OpaqueSurfaces.clear();
-	mainDrawContext.EnvSurfaces.clear();
-	mainDrawContext.computeObj.clear();
 }
 
 void VulkanEngine::loadSceneObject()

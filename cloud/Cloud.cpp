@@ -8,7 +8,7 @@
 
 void CloudScene::guiRender()
 {
-  ImGui::Begin("cloud controller");
+  	ImGui::Begin("cloud controller");
 	ImGui::SliderFloat("lightAbsorptionCoeff", &constants.lightAbsorptionCoeff, 0, 100);
 	ImGui::SliderFloat("densityAbsorption", &constants.densityAbsorption, 0, 100);
 	ImGui::SliderFloat("aniso", &constants.aniso, 0, 2);
@@ -33,159 +33,11 @@ void CloudScene::initialize(VulkanEngine* engine)
 	rot = glm::vec4(1,0,0, 3.14 / 2.0f);
 	modelscale = glm::vec3(10, 10, 10);
 	imageWidth = 128;
-  imageHeight = 128;
-  imageDepth = 128;
-  init_commands();
-  init_sync_structures();
-  init_image_buffer();
-  // initGenCloudPipelines();
-  // initMakeLightTexturePipelines();
-
-}
-
-void CloudScene::initGenCloudPipelines()
-{
-	VkDescriptorSetLayout descriptorSetLayout;
-	VkDescriptorSet descriptorSet;
-	{
-		DescriptorLayoutBuilder builder;
-    builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    descriptorSetLayout = builder.build(_engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
-	}
-	descriptorSet = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
-	{
-    DescriptorWriter writer;	
-		writer.write_image(0, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, nullptr , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    writer.update_set(_engine->_device, descriptorSet);
-  }
-	_deletionQueue.push_function([=]() {
-        vkDestroyDescriptorSetLayout(_engine->_device, descriptorSetLayout, nullptr);
-  });
-	{
-	VkShaderModule compShader;
-	if (!vkutil::load_shader_module("./spv/cloudDensity.comp.spv", _engine->_device, &compShader)){
-		std::cout << "Error when building the cloudDensity comp shader module" << std::endl;
-	}
-	VkPipeline cloudDensityPipeline;
-	VkPipelineLayout cloudDensityPipeLayout;
-
-	VkPipelineShaderStageCreateInfo computeShaderStageInfo{};
-	computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	computeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	computeShaderStageInfo.module = compShader;
-	computeShaderStageInfo.pName = "main";
-
-	VkDescriptorSetLayout SetLayouts[] = { descriptorSetLayout};
-
-	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = SetLayouts;
-
-	VkPushConstantRange push_constant;
-	push_constant.offset = 0;
-	push_constant.size = sizeof(CloudPushConstants);
-	push_constant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	pipelineLayoutInfo.pPushConstantRanges = &push_constant;
-	pipelineLayoutInfo.pushConstantRangeCount = 1;
-
-	if (vkCreatePipelineLayout(_engine->_device, &pipelineLayoutInfo, nullptr, &cloudDensityPipeLayout) != VK_SUCCESS) {
-	    throw std::runtime_error("failed to create compute pipeline layout!");
-	}
-
-	VkComputePipelineCreateInfo pipelineInfo{};
-	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-	pipelineInfo.layout = cloudDensityPipeLayout;
-	pipelineInfo.stage = computeShaderStageInfo;
-
-	if (vkCreateComputePipelines(_engine->_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &cloudDensityPipeline) != VK_SUCCESS) {
-	    throw std::runtime_error("failed to create compute pipeline!");
-	}
-	_engine->create_material(cloudDensityPipeline, cloudDensityPipeLayout, "MAKECLOUD", pipelineLayoutInfo.setLayoutCount, descriptorSet);
-	vkDestroyShaderModule(_engine->_device, compShader, nullptr);
-	_deletionQueue.push_function([=]() {
-    vkDestroyPipeline(_engine->_device, cloudDensityPipeline, nullptr);
-		vkDestroyPipelineLayout(_engine->_device, cloudDensityPipeLayout, nullptr);
-  });
-	}
-}
-
-void CloudScene::initMakeLightTexturePipelines()
-{
-  VkDescriptorSetLayout descriptorSetLayout;
-	VkDescriptorSet descriptorSet;
-	{
-		DescriptorLayoutBuilder builder;
-    builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-		builder.add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    descriptorSetLayout = builder.build(_engine->_device, VK_SHADER_STAGE_COMPUTE_BIT);
-	}
-	descriptorSet = _engine->globalDescriptorAllocator.allocate(_engine->_device, descriptorSetLayout);
-	{
-    DescriptorWriter writer;	
-		writer.write_image(0, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDDENSITY]._imageView, _defaultSamplerLinear , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-		writer.write_image(1, _cloudImageBuffer[0][CLOUDTEXTUREID::CLOUDLIGHT]._imageView, nullptr , VK_IMAGE_LAYOUT_GENERAL,VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    writer.update_set(_engine->_device, descriptorSet);
-  }
-	_deletionQueue.push_function([=]() {
-        vkDestroyDescriptorSetLayout(_engine->_device, descriptorSetLayout, nullptr);
-  });
-  {
-  VkShaderModule compShader;
-	if (!vkutil::load_shader_module("./spv/cloudLighting.comp.spv", _engine->_device, &compShader)){
-		std::cout << "Error when building the cloudLighting comp shader module" << std::endl;
-	}
-	VkPipeline cloudLightingPipeline;
-	VkPipelineLayout cloudLightingPipeLayout;
-
-	VkPipelineShaderStageCreateInfo computeShaderStageInfo{};
-	computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	computeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	computeShaderStageInfo.module = compShader;
-	computeShaderStageInfo.pName = "main";
-
-	VkDescriptorSetLayout SetLayouts[] = { descriptorSetLayout};
-
-	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = SetLayouts;
-
-	VkPushConstantRange push_constant;
-	push_constant.offset = 0;
-	push_constant.size = sizeof(CloudPushConstants);
-	push_constant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	pipelineLayoutInfo.pPushConstantRanges = &push_constant;
-	pipelineLayoutInfo.pushConstantRangeCount = 1;
-
-	if (vkCreatePipelineLayout(_engine->_device, &pipelineLayoutInfo, nullptr, &cloudLightingPipeLayout) != VK_SUCCESS) {
-	    throw std::runtime_error("failed to create compute pipeline layout!");
-	}
-
-	VkComputePipelineCreateInfo pipelineInfo{};
-	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-	pipelineInfo.layout = cloudLightingPipeLayout;
-	pipelineInfo.stage = computeShaderStageInfo;
-
-	if (vkCreateComputePipelines(_engine->_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &cloudLightingPipeline) != VK_SUCCESS) {
-	    throw std::runtime_error("failed to create compute pipeline!");
-	}
-	_engine->create_material(cloudLightingPipeline, cloudLightingPipeLayout, "MAKELIGHTTEXTURE", pipelineLayoutInfo.setLayoutCount, descriptorSet);
-	vkDestroyShaderModule(_engine->_device, compShader, nullptr);
-	_deletionQueue.push_function([=]() {
-    vkDestroyPipeline(_engine->_device, cloudLightingPipeline, nullptr);
-		vkDestroyPipelineLayout(_engine->_device, cloudLightingPipeLayout, nullptr);
-  });
-	}
-}
-
-void CloudScene::uploadCubeMesh()
-{
-	Mesh cube{};
-  float lineLength = 1.0f;
-
-  _engine->upload_mesh(cube);
-	_engine->_meshes["cube_cloud"] = cube;
+	imageHeight = 128;
+	imageDepth = 128;
+	init_commands();
+	init_sync_structures();
+	init_image_buffer();
 }
 
 void CloudScene::init_commands()
@@ -245,34 +97,18 @@ void CloudScene::init_image_buffer()
 	});
 }
 
-void CloudScene::makeLightTexture()
-{
-  Material* computMaterial = _engine->get_material("MAKELIGHTTEXTURE");
-	VkCommandBuffer cmd = _engine->get_current_frame()._mainCommandBuffer;
-  vkCmdPushConstants(cmd, computMaterial->pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CloudPushConstants), &constants);
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computMaterial->pipeline);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computMaterial->pipelineLayout, 0, 1, &computMaterial->textureSet, 0, nullptr);
-  vkCmdDispatch(cmd, imageWidth/dispatchSize, imageHeight/dispatchSize, imageDepth / dispatchSize);
-}
-
-void CloudScene::genCloud()
-{
-  Material* computMaterial = _engine->get_material("MAKECLOUD");
-	VkCommandBuffer cmd = _engine->get_current_frame()._mainCommandBuffer;
-
-  vkCmdPushConstants(cmd, computMaterial->pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CloudPushConstants), &constants);
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computMaterial->pipeline);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, computMaterial->pipelineLayout, 0, 1, &computMaterial->textureSet, 0, nullptr);
-  vkCmdDispatch(cmd, imageWidth/dispatchSize, imageHeight/dispatchSize, imageDepth / dispatchSize);
-}
-
 void CloudScene::update(float dt)
 {
 	constants.uvwOffset += glm::vec4(constants.dt/4.0f, 0.,constants.dt/4.0f,0.);
 }
 
-void CloudScene::draw(VkCommandBuffer cmd)
+void CloudScene::drawSceneObject(VulkanEngine* engine)
 {
+	// glm::mat4 sandTransForm1 = glm::translate(glm::vec3(0, -40, -20 )) * glm::scale(glm::mat4(1.0f), glm::vec3(20.0f));
+	// engine->loadedScenes["cloudCube"]->Draw(sandTransForm1, engine->mainDrawContext);
+
+	engine->mainDrawContext.computeObj.push_back(engine->loadedComputeObj["cloudDensity"].get());
+	engine->mainDrawContext.computeObj.push_back(engine->loadedComputeObj["cloudLighting"].get());
 }
 
 void CloudScene::loadSceneObject(VulkanEngine* engine)

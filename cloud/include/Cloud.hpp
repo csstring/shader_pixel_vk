@@ -15,13 +15,6 @@ class CloudScene
     DeletionQueue _deletionQueue;
     ComputeContext _computeContext;
 
-    void makeLightTexture();
-    void genCloud();
-
-    void initRenderPipelines();
-    void initGenCloudPipelines();
-    void initMakeLightTexturePipelines();
-
     glm::vec4 rot;
 
   public:
@@ -45,10 +38,9 @@ class CloudScene
     
     void initialize(VulkanEngine* engine);
     glm::mat4 getModelMatrix(){return glm::translate(modelTrans) * glm::rotate(glm::mat4(1.0f), rot.w, glm::vec3(rot)) * glm::scale(modelscale);};
-    void uploadCubeMesh();
     void loadSceneObject(VulkanEngine* engine);
+    void drawSceneObject(VulkanEngine* engine);
     void update(float dt);
-    void draw(VkCommandBuffer cmd);
     void guiRender();
     void init_commands();
 		void init_sync_structures();

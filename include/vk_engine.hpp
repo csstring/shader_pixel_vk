@@ -42,12 +42,15 @@ class VulkanEngine
     void init_scene();
     void load_meshes();
     void draw_objects(VkCommandBuffer cmd, uint32_t swapchainImageIndex);
-    void computeCloud(VkCommandBuffer cmd);
+    void computeShaderCalc(VkCommandBuffer cmd);
     void init_descriptors();
     void init_imgui();
     void update_scene();
     void loadSceneObject();
-
+    void GUIRender();
+    void OpaqueRender(VkCommandBuffer cmd,VkRenderPassBeginInfo rpInfo, GPUDrawPushConstants& pushConstants, VkDescriptorSet globalDescriptor);
+    void TransparentRender(VkCommandBuffer cmd,VkRenderPassBeginInfo rpInfo, GPUDrawPushConstants& pushConstants, VkDescriptorSet globalDescriptor);
+  
   private:  
     
   public :
@@ -55,27 +58,17 @@ class VulkanEngine
     void cleanup();
     void draw();
     void run();
-    void load_images();
-	  void upload_mesh(Mesh& mesh);
     GPUMeshBuffers uploadMeshBuffers(std::vector<uint32_t> indices, std::vector<Vertex> vertices);
     FrameData& get_current_frame(){return _frames[_frameNumber % FRAME_OVERLAP];}
-    Material* create_material(VkPipeline pipeline, VkPipelineLayout layout,
-    const std::string& name, 
-    uint32_t layoutCount = 0, VkDescriptorSet descriptorSet = VK_NULL_HANDLE,
-    uint32_t constantSize = 0, void* constantPtr = nullptr
-    );
-    Material* get_material(const std::string& name);
     AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
     AllocatedImage createCubeImage(ktxTexture* ktxTexture, VkFormat format, VkSampler* sampler);
     
-    Mesh* get_mesh(const std::string& name);
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
     void destroy_buffer(const AllocatedBuffer& buffer);
     void destroy_image(const AllocatedImage& img);
-    void drawScene();
-    
+
   public :
     bool _isInitialized{ false };
 	  int _frameNumber {0};
