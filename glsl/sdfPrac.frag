@@ -86,8 +86,6 @@ layout( push_constant ) uniform constants
 	mat4 proj;
 } PushConstants;
 
-layout(set = 1, binding = 1) uniform sampler3D densityTex;
-layout(set = 1, binding = 2) uniform sampler3D lightingTex;
 layout(set = 1, binding = 3) uniform samplerCube skyBox;
 
 layout (location = 0) in vec3 inNormal;
@@ -101,28 +99,6 @@ layout (location = 0) out vec4 outFragColor;
 #define cloudy  0.5 //0.0 clear sky
 #define haze  0.01 * (cloudy*20.)
 
-//Environment
-const float R0 = 6360e3; //planet radius //6360e3 actual 6371km
-const float Ra = 6380e3; //atmosphere radius //6380e3 troposphere 8 to 14.5km
-const float I = 10.; //sun light power, 10.0 is normal
-const float SI = 5.; //sun intensity for sun
-const float g = 0.45; //light concentration .76 //.45 //.6  .45 is normaL
-const float g2 = g * g;
-
-const float s = 0.999; //light concentration for sun
-const float s2 = s;
-const float Hr = 8e3; //Rayleigh scattering top //8e3
-const float Hm = 1.2e3; //Mie scattering top //1.3e3
-vec3 bM = vec3(21e-6); //normal mie // vec3(21e-6)
-
-//Rayleigh scattering (sky color, atmospheric up to 8km)
-vec3 bR = vec3(5.8e-6, 13.5e-6, 33.1e-6); //normal earth
-//vec3 bR = vec3(5.8e-6, 33.1e-6, 13.5e-6); //purple
-//vec3 bR = vec3( 63.5e-6, 13.1e-6, 50.8e-6 ); //green
-//vec3 bR = vec3( 13.5e-6, 23.1e-6, 115.8e-6 ); //yellow
-//vec3 bR = vec3( 5.5e-6, 15.1e-6, 355.8e-6 ); //yeellow
-//vec3 bR = vec3(3.5e-6, 333.1e-6, 235.8e-6 ); //red-purple
-
 vec3 GetSunLightDirection()
 {
     return normalize(sceneData.sunlightDirection.xyz);
@@ -134,86 +110,12 @@ vec3 GetSunLightColor()
     // return 0.9 * vec3(0.9, 0.5, 0.4);
 }
 
-vec3 C = vec3(0., -R0, 0.); //planet center
-
-void densities(in vec3 pos, out float rayleigh, out float mie) {
-	float h = length(pos - C) - R0;
-	rayleigh =  exp(-h/Hr);
-	mie = exp(-h/Hm) + haze; 
-}
-
-float escape(in vec3 p, in vec3 d, in float R) {
-	vec3 v = p - C;
-	float b = dot(v, d);
-	float c = dot(v, v) - R*R;
-	float det2 = b * b - c;
-	if (det2 < 0.) return -1.;
-	float det = sqrt(det2);
-	float t1 = -b - det, t2 = -b + det;
-	return (t1 >= 0.) ? t1 : t2;
-}
-
-// this can be explained: http://www.scratchapixel.com/lessons/3d-advanced-lessons/simulating-the-colors-of-the-sky/atmospheric-scattering/
-vec3 scatter(vec3 o, vec3 d) {
-    vec3 color = vec3(0);
-	float L = escape(o, d, Ra);	
-	float mu = dot(d, GetSunLightDirection());
-	float opmu2 = 1. + mu*mu;
-	float phaseR = .0596831 * opmu2;
-	float phaseM = .1193662 * (1. - g2) * opmu2 / ((2. + g2) * pow(1. + g2 - 2.*g*mu, 1.5));
-    float phaseS = .1193662 * (1. - s2) * opmu2 / ((2. + s2) * pow(1. + s2 - 2.*s*mu, 1.5));
-	
-	float depthR = 0., depthM = 0.;
-	vec3 R = vec3(0.), M = vec3(0.);
-    float step = 8;
-	float dl = L / float(step);
-	for (int i = 0; i < step; ++i) {
-		float l = float(i) * dl;
-		vec3 p = (o + d * l);
-
-		float dR, dM;
-		densities(p, dR, dM);
-		dR *= dl; dM *= dl;
-		depthR += dR;
-		depthM += dM;
-
-		float Ls = escape(p, GetSunLightDirection(), Ra);
-		if (Ls > 0.) {
-			float dls = Ls / float(step);
-			float depthRs = 0., depthMs = 0.;
-			for (int j = 0; j < step; ++j) {
-				float ls = float(j) * dls;
-				vec3 ps = ( p + GetSunLightDirection() * ls );
-				float dRs, dMs;
-				densities(ps, dRs, dMs);
-				depthRs += dRs * dls;
-				depthMs += dMs * dls;
-			}
-
-			vec3 A = exp(-(bR * (depthRs + depthR) + bM * (depthMs + depthM)));
-			R += (A * dR);
-			M += A * dM ;
-		}
-	}
-
-    color = (I) *(M * bM * (phaseM )); // Mie scattering
-    color += (SI) *(M * bM *phaseS); //Sun
-    color += (I) *(R * bR * phaseR); //Rayleigh scattering
-    return color + 0.1 *(bM*depthM);
-}
-
-
-// --------------------------------------------//
-//               Noise Functions
-// --------------------------------------------//
-// Taken from Inigo Quilez's Rainforest ShaderToy:
 // https://www.shadertoy.com/view/4ttSWf
 float hash1( float n )
 {
     return fract( n*17.0*fract( n*0.3183099 ) );
 }
 
-// Taken from Inigo Quilez's Rainforest ShaderToy:
 // https://www.shadertoy.com/view/4ttSWf
 float noise( in vec3 x )
 {
@@ -249,7 +151,6 @@ const mat3 m3  = mat3( 0.00,  0.80,  0.60,
                       -0.80,  0.36, -0.48,
                       -0.60, -0.48,  0.64 );
 
-// Taken from Inigo Quilez's Rainforest ShaderToy:
 // https://www.shadertoy.com/view/4ttSWf
 float fbm( in vec3 x, int iterations )
 {
@@ -266,8 +167,6 @@ float fbm( in vec3 x, int iterations )
     }
 	return a;
 }
-
-// Taken from Inigo Quilez's Rainforest ShaderToy:
 // https://www.shadertoy.com/view/4ttSWf
 float fbm_4( in vec3 x )
 {
@@ -305,7 +204,6 @@ float sdSphere( vec3 p, vec3 origin, float s )
   return length(p)-s;
 }
 
-
 struct Sphere
 {
     vec3 origin;
@@ -321,11 +219,8 @@ void GetSphere(int index, out vec3 origin, out float radius)
     spheres[3] = Sphere(vec3(-24, GROUND_LEVEL, 85), 15.0);
     spheres[4] = Sphere(vec3(15, GROUND_LEVEL, 90), 13.0);
 
-
-
     origin = spheres[index].origin;
     radius = spheres[index].radius;
-
 }
 
 float GetWaterWavesDisplacement(vec3 position, float time)
@@ -553,12 +448,6 @@ float Specular(in vec3 reflection, in vec3 lightDirection, float shininess)
     return 0.05 * pow(max(0.0, dot(reflection, lightDirection)), shininess);
 }
 
-vec3 Diffuse(in vec3 normal, in vec3 lightVec, in vec3 diffuse)
-{
-    float nDotL = dot(normal, lightVec);
-    return clamp(nDotL * diffuse, 0.0, 1.0);
-}
-
 vec3 BeerLambert(vec3 absorption, float dist)
 {
     return exp(-absorption * dist);
@@ -629,8 +518,6 @@ vec3 GetApproximateShadowFactor(vec3 position, vec3 rayDirection)
 	return BeerLambert(WaterAbsorption / WaterColor, distanceToPlane);
 }
 
-float seed = 0.;
-float rand() { return fract(sin(seed++ + sceneData.waterData.x)*43758.5453123); }
 
 float smoothVoronoi( in vec2 x )
 {
@@ -650,11 +537,6 @@ float smoothVoronoi( in vec2 x )
     return -(1.0/32.0)*log( res );
 }
 
-vec3 GetBaseSkyColor(vec3 rayDirection)
-{
-    return scatter(vec3(0,sceneData.viewPos.y,0), rayDirection);
-}
-
 vec3 GetAmbientSkyColor()
 {
     return SKY_AMBIENT_MULTIPLIER * mix(vec3(0.2, 0.5, 0.8),vec3(0.7, 0.75, 0.9), max(1, 0.0));
@@ -665,99 +547,9 @@ vec3 GetAmbientShadowColor()
     return vec3(0, 0, 0.2);
 }
 
-float GetCloudDenity(vec3 position)
-{
-    float time = sceneData.waterData.x * 0.25;
-    vec3 noisePosition = position + vec3(0.0, 0.0, time);
-    float noise = fbm_4(noisePosition);
-    float noiseCutoff = -0.3;
-    return max(0.0, 3.0f * (noise - noiseCutoff));
-}
-
-float HenyeyGreensteinPhase(vec3 L, vec3 V, float aniso) {
-    float cosTheta = dot(L, -V);
-    float g = aniso;
-    return (1.0 - g * g) / (4.0 * 3.141592 * pow(abs(1.0 + g * g - 2.0 * g * cosTheta), 1.5));
-}
-
-float BeerLambert1(float absorptionCoefficient, float distanceTraveled) {
-    return exp(-absorptionCoefficient * distanceTraveled);
-}
-
-vec3 GetUVW(vec3 posModel) {
-    return (posModel + 1.0) * 0.5;
-}
-
-vec4 CloudColor(vec3 dir)
-{
-    int numSteps = 32;
-    float stepSize = 0.7 / float(numSteps);
-    vec3 volumeAlbedo = vec3(1, 1, 1);
-    vec4 color = vec4(0, 0, 0, 1);
-    vec3 marchPosition = vec3(0.0f);
-    float cloudAbsorption = 8;//fix
-    float contrastFactor = 0.4;
-    for (int i =0; i < numSteps; ++i)
-    {
-        vec3 uvw = GetUVW(marchPosition);
-        float density = texture(densityTex, uvw).r;
-        float lighting = texture(lightingTex, uvw).r;
-        density = pow(density, contrastFactor);
-        if (density > 1e-3){
-            float prevAlpha = color.a;
-            color.a *= BeerLambert1(cloudAbsorption * density, stepSize);
-            float absorptionFromMarch = prevAlpha - color.a;
-            color.rgb += absorptionFromMarch * volumeAlbedo * (1.5*GetSunLightColor()+GetAmbientShadowColor()) * density * lighting;
-                        //  * HenyeyGreensteinPhase(PushConstants.lightDir.xyz, dirModel, PushConstants.aniso);
-        }
-
-        marchPosition += dir*stepSize;
-        if (abs(marchPosition.x) > 1 || abs(marchPosition.y) > 1 || abs(marchPosition.z) > 1)
-            break;
-
-        if (color.a < 1e-3)
-            break;
-    }
-    color = clamp(color, 0.0, 1.0);
-    color.a = 1.0 - color.a;
-    return color + vec4(GetAmbientSkyColor(),0);
-    // if (inModelPos.z > -0.7) color.a = 0; 
-    // return vec4(volumeAlbedo * (mix(GetAmbientShadowColor(), 1.5*GetSunLightColor(), vec3(color.a)) + GetAmbientSkyColor()), min(color.a, 1.0f));
-}
-
-vec4 GetCloudColor(vec3 position)
-{
-    float cloudDensity = GetCloudDenity(position);
-    vec3 cloudAlbedo = vec3(1, 1, 1);
-    float cloudAbsorption = 0.6;
-    float marchSize = 0.25;
-
-    vec3 lightFactor = vec3(1, 1, 1);
-    {
-        vec3 marchPosition = position;
-        int selfShadowSteps = 4;
-        for(int i = 0; i < selfShadowSteps; i++)
-        {
-            marchPosition += GetSunLightDirection() * marchSize;
-            float density = cloudAbsorption * GetCloudDenity(marchPosition);
-            lightFactor *= BeerLambert(vec3(density, density, density), marchSize);
-        }
-    }
-
-    return vec4(
-        cloudAlbedo * 
-        	(mix(GetAmbientShadowColor(), 1.3 * GetSunLightColor(), lightFactor) +
-             GetAmbientSkyColor()), 
-        min(cloudDensity, 1.0));
-}
 
 vec3 GetSkyColor(in vec3 rayDirection)
 {
-    // vec3 skyColor = GetBaseSkyColor(rayDirection);
-    // vec4 cloudColor = CloudColor(rayDirection );
-    // skyColor = mix(skyColor, cloudColor.rgb, cloudColor.a);
-
-    // return skyColor.xyz;
     if (rayDirection.y < 0.02) rayDirection.y = 0.02;
     return texture(skyBox, (rayDirection)).xyz;
 }

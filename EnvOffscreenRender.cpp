@@ -43,14 +43,14 @@ void EnvOffscreenRender::createCubeMap(VulkanEngine* engine)
 	subresourceRange.levelCount = 1;
 	subresourceRange.layerCount = 6;
 
-  //이거 무슨 코드인지 모르겠네
-  imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+  	imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	imageViewInfo.subresourceRange.layerCount = 1;
 	imageViewInfo.image = envCubeImage._image;
 
-  for (uint32_t i = 0; i < 6; i++)
+  	for (uint32_t i = 0; i < 6; i++)
 	{
-    imageViewInfo.subresourceRange.baseArrayLayer = i;
+    	imageViewInfo.subresourceRange.baseArrayLayer = i;
 		VK_CHECK(vkCreateImageView(engine->_device, &imageViewInfo, nullptr, &envCubeMapFaceImageViews[i]));
 	}
 
@@ -298,7 +298,7 @@ void EnvOffscreenRender::drawSceneObject(VulkanEngine* engine)
   engine->loadedScenes["envoff"]->Draw(glm::mat4(1.0f), engine->mainDrawContext);
 	engine->loadedScenes["ocean"]->Draw(glm::mat4(1.0f) * oceanTransForm, engine->mainDrawContext);
 
-  // engine->loadedScenes["World1_SkyBox"]->Draw(skyBoxTransForm, engine->mainDrawContext);
-	// engine->loadedScenes["vulkanmodels"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
-	// engine->loadedScenes["vulkanscenelogos"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
+  engine->loadedScenes["World1_SkyBox"]->Draw(skyBoxTransForm, engine->mainDrawContext);
+	engine->loadedScenes["vulkanmodels"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
+	engine->loadedScenes["vulkanscenelogos"]->Draw(vulkanModelTransForm ,engine->mainDrawContext);
 }

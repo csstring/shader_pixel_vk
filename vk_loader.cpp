@@ -368,6 +368,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
             // }
             materialResources.metalRoughImage = engine->_errorCheckerboardImage;
             materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
+            materialResources.skyBoxImage = engine->_vulkanBoxImage;
+    	    materialResources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
             materialResources.dataBuffer = file.materialDataBuffer.buffer;
             materialResources.dataBufferOffset = data_index * sizeof(GLTFMetallic::MaterialConstants);
             // grab textures from gltf file
@@ -418,7 +420,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,std::st
         // }
         materialResources.metalRoughImage = engine->_errorCheckerboardImage;
         materialResources.metalRoughSampler = engine->_defaultSamplerLinear;
-
+        materialResources.skyBoxImage = engine->_vulkanBoxImage;
+    	materialResources.skyBoxSampler = engine->_vulkanBoxSamplerLinear;
         // set the uniform buffer for the material data
         materialResources.dataBuffer = file.materialDataBuffer.buffer;
         materialResources.dataBufferOffset = 0;

@@ -24,7 +24,7 @@ void PSO::buildWorldSkyBoxpipelines(VulkanEngine* engine, GLTFMetallic* metallic
 	VkPipelineLayout newLayout;
 	VK_CHECK(vkCreatePipelineLayout(engine->_device, &skybox_layout_info, nullptr, &newLayout));
 
-  world_skyBoxPipeline.layout = newLayout;
+  	world_skyBoxPipeline.layout = newLayout;
 	VertexInputDescription vertexDescription = Vertex::get_vertex_description();
 	PipelineBuilder pipelineBuilder;
 	pipelineBuilder.loadShader("./spv/skybox.vert.spv", engine->_device, VK_SHADER_STAGE_VERTEX_BIT);

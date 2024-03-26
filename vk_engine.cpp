@@ -915,9 +915,7 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
 	AllocatedImage new_image = create_image(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
 
 	immediate_submit([&](VkCommandBuffer cmd) {
-		vkutil::transitionImageLayout(cmd, new_image._image, new_image._imageFormat,
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT));
-
+		vkutil::setImageLayout(cmd, new_image._image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 		VkBufferImageCopy copyRegion = {};
 		copyRegion.bufferOffset = 0;
 		copyRegion.bufferRowLength = 0;
@@ -932,9 +930,7 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
 		// copy the buffer into the image
 		vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image._image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
 			&copyRegion);
-
-		vkutil::transitionImageLayout(cmd, new_image._image,new_image._imageFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT));
+		vkutil::setImageLayout(cmd, new_image._image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		});
 	destroy_buffer(uploadbuffer);
 	return new_image;
@@ -1012,20 +1008,12 @@ AllocatedImage VulkanEngine::createCubeImage(ktxTexture* ktxTexture, VkFormat fo
 	}
 
 	immediate_submit([&](VkCommandBuffer cmd) {
-		vkutil::transitionImageLayout(cmd, newImage._image, newImage._imageFormat,
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		subresourceRange);
-
-		// copy the buffer into the image
+		vkutil::setImageLayout(cmd, newImage._image, VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,subresourceRange);
 		vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, newImage._image, 
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
 		static_cast<uint32_t>(bufferCopyRegions.size()),
 		bufferCopyRegions.data());
-
-		vkutil::transitionImageLayout(cmd, newImage._image,newImage._imageFormat, 
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			subresourceRange);
+		vkutil::setImageLayout(cmd, newImage._image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,subresourceRange);
 	});
 	destroy_buffer(uploadbuffer);
 
