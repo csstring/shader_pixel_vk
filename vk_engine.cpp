@@ -37,6 +37,9 @@ void VulkanEngine::init()
 		_windowExtent.height, //window height in pixels
 		window_flags 
 	);
+	envRender = std::make_unique<EnvOffscreenRender>();
+	_cloud = std::make_unique<CloudScene>();
+	_portalManager = std::make_unique<Portal>();
 
   	init_vulkan();
 	init_swapchain();
@@ -49,9 +52,6 @@ void VulkanEngine::init()
   	init_scene();
 	load_meshes();
 
-	envRender = std::make_unique<EnvOffscreenRender>();
-	_cloud = std::make_unique<CloudScene>();
-	_portalManager = std::make_unique<Portal>();
 	
 	envRender->initialize(this);
 	_cloud->initialize(this);

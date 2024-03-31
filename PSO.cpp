@@ -421,7 +421,7 @@ void PSO::buildCloudLightingPipelines(VulkanEngine* engine)
 
 void PSO::buildPipeLine(VulkanEngine* engine)
 {
-  build_pipelines(engine,&(engine->metalRoughMaterial));
+  	build_pipelines(engine,&(engine->metalRoughMaterial));
 	buildWorldSkyBoxpipelines(engine,&(engine->metalRoughMaterial));
 	buildstencilFillpipelines(engine,&(engine->metalRoughMaterial));
 	build_cloudPipelines(engine,&(engine->metalRoughMaterial));

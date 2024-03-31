@@ -84,7 +84,7 @@ vec4 CloudColor(vec3 dir)
             float prevAlpha = color.a;
             color.a *= BeerLambert1(cloudAbsorption * density, stepSize);
             float absorptionFromMarch = prevAlpha - color.a;
-            color.rgb += absorptionFromMarch * volumeAlbedo * (1.5*GetSunLightColor()+GetAmbientShadowColor()) * density * lighting;
+            color.rgb += absorptionFromMarch * volumeAlbedo * (1.5*GetSunLightColor()+GetAmbientShadowColor())  * lighting;
                         //  * HenyeyGreensteinPhase(PushConstants.lightDir.xyz, dirModel, PushConstants.aniso);
         }
 
